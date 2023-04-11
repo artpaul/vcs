@@ -1,0 +1,12 @@
+# Builds
+/out/
+
+# CMake
+CMakeSettings.json
+
+# IDEs
+.vs
+.vscode
+
+# Junk
+/junk/
