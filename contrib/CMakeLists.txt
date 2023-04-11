@@ -1,0 +1,5 @@
+add_subdirectory(cxxopts)
+add_subdirectory(flatbuffers)
+add_subdirectory(fmt)
+add_subdirectory(lz4)
+add_subdirectory(sha)
