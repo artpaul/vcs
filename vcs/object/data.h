@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <stdexcept>
 #include <type_traits>
 
 namespace Vcs {
@@ -32,13 +33,15 @@ public:
     };
 
     /** Makes DataHeader instance. */
-    static constexpr DataHeader Make(const DataType type, const uint64_t size) noexcept {
+    static constexpr DataHeader Make(const DataType type, const uint64_t size) {
         const uint8_t bytes = CountBytes(size);
         DataHeader result{};
         // Type tag.
         result.tag = (bytes << 3) | uint8_t(type);
         // Pack size.
         switch (bytes) {
+            case 8:
+                throw std::invalid_argument("the value of the size exceeds 56 bit");
             case 7:
                 result.size[6] = (size >> 48) & 0xFF;
             case 6:
@@ -61,6 +64,10 @@ public:
     /** Returns count of packed bytes. */
     constexpr size_t Bytes() const noexcept {
         return 1 + ((tag >> 3) & 0x07);
+    }
+
+    constexpr auto Data() const noexcept -> const uint8_t (&)[8] {
+        return data;
     }
 
     /** Unpacks type of the object. */
@@ -92,35 +99,39 @@ public:
 
 private:
     static constexpr uint8_t CountBytes(const uint64_t size) noexcept {
-        if (size & 0xFF00000000000000) {
-            return 8;
+        if (size == 0) {
+            return 0;
         }
-        if (size & 0x00FF000000000000) {
-            return 7;
-        }
-        if (size & 0x0000FF0000000000) {
-            return 6;
-        }
-        if (size & 0x000000FF00000000) {
+        if (size & 0xFFFFFFFF00000000) {
+            if (size & 0xFF00000000000000) {
+                return 8;
+            }
+            if (size & 0x00FF000000000000) {
+                return 7;
+            }
+            if (size & 0x0000FF0000000000) {
+                return 6;
+            }
             return 5;
-        }
-        if (size & 0x00000000FF000000) {
-            return 4;
-        }
-        if (size & 0x0000000000FF0000) {
-            return 3;
-        }
-        if (size & 0x000000000000FF00) {
-            return 2;
-        }
-        if (size & 0x00000000000000FF) {
+        } else {
+            if (size & 0x00000000FF000000) {
+                return 4;
+            }
+            if (size & 0x0000000000FF0000) {
+                return 3;
+            }
+            if (size & 0x000000000000FF00) {
+                return 2;
+            }
             return 1;
         }
-        return 0;
     }
 };
 
 /// Ensure the value of DataHeader is memcpy copyable.
 static_assert(std::is_trivial<DataHeader>::value);
+
+/// Ensure DataHeader::Data() returns pointer to an array of fixed size.
+static_assert(std::is_bounded_array_v<std::remove_reference_t<decltype(DataHeader().Data())>>);
 
 } // namespace Vcs
