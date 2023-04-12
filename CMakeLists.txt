@@ -20,10 +20,12 @@ endif()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wnon-virtual-dtor -Werror")
 
 add_subdirectory(contrib)
+add_subdirectory(vcs)
 
 # Tests.
 if(BUILD_TESTS)
     add_subdirectory(contrib/gtest)
+    add_subdirectory(ut)
 
     # Local test projects.
     if(IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/junk")
