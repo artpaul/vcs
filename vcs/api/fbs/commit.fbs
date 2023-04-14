@@ -1,0 +1,31 @@
+include "types.fbs";
+
+namespace Fbs;
+
+table Commit {
+    /// List of user defined attributes sorted by name.
+    attributes:[Attribute];
+
+    /// Author.
+    author:Signature;
+
+    /// Commiter.
+    committer:Signature;
+
+    /// Commit message.
+    message:string;
+
+    /// Identifier of a root tree.
+    tree:[ubyte] (required);
+
+    /// Generation number.
+    generation:uint64;
+
+    /// List of parent revisions. Up to 16 entries.
+    parents:[ubyte];
+
+    /// Id of an object with history adjustments for the root tree.
+    renames:[ubyte];
+}
+
+root_type Commit;

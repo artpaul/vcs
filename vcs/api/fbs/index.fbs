@@ -1,0 +1,30 @@
+include "types.fbs";
+
+namespace Fbs;
+
+table Part {
+    /// Identifier of a blob object.
+    id:[ubyte];
+
+    /// Size of the blob object.
+    size:uint32;
+}
+
+/**
+ * The index holds references to the parts of object's content.
+ *
+ * This helps to overcome possible limitations of object storages
+ * and control memory usage on data loading.
+ */
+table Index {
+    /// Identfier of an original object.
+    id:[ubyte];
+
+    /// Type of the object.
+    type:DataType;
+
+    /// Objects's parts.
+    parts:[Part];
+}
+
+root_type Index;

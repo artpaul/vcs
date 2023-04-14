@@ -13,7 +13,7 @@ TEST(DataHeader, Bytes) {
     EXPECT_EQ(DataHeader::Make(DataType::Blob, 123456789ull).Bytes(), 5u);
     EXPECT_EQ(DataHeader::Make(DataType::Blob, 12345678901ull).Bytes(), 6u);
     EXPECT_EQ(DataHeader::Make(DataType::Blob, 1234567890123ull).Bytes(), 7u);
-    EXPECT_EQ(DataHeader::Make(DataType::Blob, 1234567890123456ull).Bytes(), 8u);
+    EXPECT_THROW(DataHeader::Make(DataType::Blob, 1234567890123456ull).Bytes(), std::invalid_argument);
     EXPECT_THROW(DataHeader::Make(DataType::Blob, 123456789012345678ull).Bytes(), std::invalid_argument);
 }
 
@@ -29,7 +29,6 @@ TEST(DataHeader, Type) {
     EXPECT_EQ(DataHeader::Make(DataType::Blob, 115).Type(), DataType::Blob);
     EXPECT_EQ(DataHeader::Make(DataType::Commit, 115).Type(), DataType::Commit);
     EXPECT_EQ(DataHeader::Make(DataType::Tree, 115).Type(), DataType::Tree);
-    EXPECT_EQ(DataHeader::Make(DataType::BlobRef, 115).Type(), DataType::BlobRef);
 }
 
 TEST(DataHeader, Constexpr) {

@@ -14,14 +14,21 @@ enum class DataType : uint8_t {
     None = 0,
     /// Content object.
     Blob = 1,
-    /// Commit object.
-    Commit = 2,
     /// Tree object.
-    Tree = 3,
-    /// Compound blob object.
-    BlobRef = 4,
+    Tree = 2,
+    /// Commit object.
+    Commit = 3,
+    /// History adjustment object.
+    Renames = 4,
+    /// Tag object.
+    Tag = 5,
+    /// Index object.
+    Index = 15,
 };
 
+/**
+ * @note The data model supports objects up to 256 Terabytes in size.
+ */
 class DataHeader {
 public:
     union {
@@ -37,13 +44,12 @@ public:
         const uint8_t bytes = CountBytes(size);
         DataHeader result{};
         // Type tag.
-        result.tag = (bytes << 3) | uint8_t(type);
+        result.tag = (bytes << 4) | uint8_t(type);
         // Pack size.
         switch (bytes) {
             case 8:
-                throw std::invalid_argument("the value of the size exceeds 56 bit");
             case 7:
-                result.size[6] = (size >> 48) & 0xFF;
+                throw std::invalid_argument("the value of the size exceeds 48 bit");
             case 6:
                 result.size[5] = (size >> 40) & 0xFF;
             case 5:
@@ -63,7 +69,7 @@ public:
 public:
     /** Returns count of packed bytes. */
     constexpr size_t Bytes() const noexcept {
-        return 1 + ((tag >> 3) & 0x07);
+        return 1 + ((tag >> 4) & 0x07);
     }
 
     constexpr auto Data() const noexcept -> const uint8_t (&)[8] {
@@ -72,13 +78,13 @@ public:
 
     /** Unpacks type of the object. */
     constexpr DataType Type() const noexcept {
-        return DataType(tag & 0x07);
+        return DataType(tag & 0x0F);
     }
 
     /** Unpacks size of the object. */
     constexpr uint64_t Size() const noexcept {
         uint64_t result = 0;
-        switch ((tag >> 3) & 0x07) {
+        switch ((tag >> 4) & 0x07) {
             case 7:
                 result |= uint64_t(size[6]) << 48;
             case 6:

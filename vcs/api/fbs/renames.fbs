@@ -1,0 +1,45 @@
+namespace Fbs;
+
+table CommitPath {
+    /// Source revision.
+    commit:uint;
+
+    /// Source path.
+    path:string;
+}
+
+table CopyInfo {
+    /// Affected path.
+    path:string;
+
+    /// Sources.
+    ///
+    /// Multiple sources mean merged entry.
+    sources:[CommitPath];
+}
+
+/**
+ * The renames table stores user's instructions to copy or reset certain paths.
+ */
+table Renames {
+    /// List of source commits.
+    commits:[ubyte];
+
+    /// List of copied entries.
+    ///
+    /// The copy-info overrides the parents commits
+    /// for the specific path.
+    ///
+    /// All entries should be lexicographically ordered by path.
+    copies:[CopyInfo];
+
+    /// List of replaced entries.
+    ///
+    /// The 'replacement' means what the associated commit is
+    /// the initial point of an entry's history.
+    ///
+    /// All entries should be lexicographically ordered.
+    replaces:[string];
+}
+
+root_type Renames;

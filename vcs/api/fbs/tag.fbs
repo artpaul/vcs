@@ -1,0 +1,22 @@
+include "types.fbs";
+
+namespace Fbs;
+
+table Tag {
+    /// List of user defined attributes sorted by name.
+    attributes:[Attribute];
+
+    /// Description of the tag.
+    message:string;
+
+    /// Name of the tag.
+    name:string;
+
+    /// Author of the tag.
+    tagger:Signature;
+
+    /// Identifier of a tagged object.
+    object:[ubyte] (required);
+}
+
+root_type Tag;

@@ -1,0 +1,49 @@
+namespace Fbs;
+
+/**
+ * Types of objects supported by the data model.
+ */
+enum DataType : uint8 {
+    /// Null or unspecified object.
+    None = 0,
+
+    /// Content object.
+    Blob = 1,
+
+    /// Tree object.
+    Tree = 2,
+
+    /// Commit object.
+    Commit = 3,
+
+    /// History adjustment object.
+    Renames = 4,
+
+    /// Tag object.
+    Tag = 5,
+
+    /// Index object.
+    Index = 15,
+}
+
+table Attribute {
+    /// Name of the attribute.
+    name:string (required);
+
+    /// Value of the attribute.
+    value:string;
+}
+
+/**
+ * An action signature (e.g. for committers, taggers, etc).
+ */
+table Signature {
+    /// Unique user identifier (email, login, etc).
+    id:string;
+
+    /// Human readable name.
+    name:string;
+
+    /// Timestamp in UTC.
+    when:uint64;
+}

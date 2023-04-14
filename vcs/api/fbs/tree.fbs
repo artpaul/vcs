@@ -1,0 +1,36 @@
+namespace Fbs;
+
+enum PathType : uint8 {
+    /// A regular file.
+    File = 0,
+
+    /// A directory.
+    Directory = 1,
+
+    /// A file with the execute permission.
+    Executible = 2,
+
+    /// A symbolic link.
+    Symlink = 3,
+}
+
+table TreeEntry {
+    /// Identifier of an object.
+    id:[ubyte] (required);
+
+    /// Name of the entry.
+    name:string (required);
+
+    /// Type of the entry.
+    type:PathType;
+
+    /// Size of the object.
+    size:uint64;
+}
+
+table Tree {
+    /// All entries should be lexicographically ordered by name.
+    entries:[TreeEntry];
+}
+
+root_type Tree;
