@@ -2,6 +2,7 @@
 
 #include "object.h"
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -45,7 +46,7 @@ struct CommitBuilder {
     std::string message;
 
     /// Root tree.
-    HashId tree;
+    HashId tree{};
     /// Generation number.
     uint64_t generation{0};
     /// List of parent revisions.
@@ -55,6 +56,41 @@ struct CommitBuilder {
 
 public:
     std::string Serialize();
+};
+
+/**
+ * Serialize index object into FlatBuffers format.
+ */
+class IndexBuilder {
+public:
+    constexpr IndexBuilder() noexcept = default;
+
+    IndexBuilder(const HashId& id, DataType type) noexcept;
+
+    IndexBuilder& Append(const HashId& id, const uint32_t size);
+
+    IndexBuilder& SetId(const HashId& id) noexcept;
+
+    IndexBuilder& SetType(const DataType type) noexcept;
+
+    void EnumerateParts(const std::function<void(const HashId&, const uint32_t)>& cb) const;
+
+    std::string Serialize() const;
+
+private:
+    struct Part {
+        /// Identifier of a blob object.
+        HashId id;
+        /// Size of the blob object.
+        uint32_t size;
+    };
+
+    /// Identfier of an original object.
+    HashId id_{};
+    /// Type of the object.
+    DataType type_{};
+    /// Object's parts.
+    std::vector<Part> parts_;
 };
 
 /**

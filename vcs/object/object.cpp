@@ -62,6 +62,18 @@ Object Object::Load(const DataType type, const std::string_view content) {
     return Object(std::move(buf));
 }
 
+Object Object::Load(const DataHeader header, const std::function<void(std::byte* buf, size_t len)>& cb) {
+    auto size = header.Size();
+    auto buf = std::make_shared_for_overwrite<std::byte[]>(sizeof(Adaptor::Tag) + size);
+    // Set object's tag.
+    Adaptor::GetTag(buf.get())->type = uint8_t(header.Type());
+    Adaptor::GetTag(buf.get())->size = size;
+    // Initialize content.
+    cb(Adaptor::GetData(buf.get()), size);
+    // Done.
+    return Object(std::move(buf));
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 Blob Object::AsBlob() const {
@@ -190,7 +202,8 @@ Commit Commit::Load(const std::string_view data) {
 
 RepeatedField<Commit::Attribute, Commit::RangeAttribute> Commit::Attributes() const {
     return RepeatedField<Attribute, RangeAttribute>(
-        Fbs::GetCommit(Adaptor::GetData(data_.get()))->attributes());
+        Fbs::GetCommit(Adaptor::GetData(data_.get()))->attributes()
+    );
 }
 
 Commit::Signature Commit::Author() const {
@@ -262,7 +275,8 @@ uint64_t Index::Part::Size() const {
 
 Index::Part Index::RangeParts::Item(const void* p, size_t i) {
     return Part(
-        static_cast<const flatbuffers::Vector<flatbuffers::Offset<Fbs::Part>>*>(p)->GetAs<Fbs::Part>(i));
+        static_cast<const flatbuffers::Vector<flatbuffers::Offset<Fbs::Part>>*>(p)->GetAs<Fbs::Part>(i)
+    );
 }
 
 size_t Index::RangeParts::Size(const void* p) {

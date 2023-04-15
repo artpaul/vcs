@@ -17,8 +17,9 @@ TEST(HashId, Builder) {
     EXPECT_EQ(MakeHashId(STR_TEST).ToHex(), STR_HEX_ID);
 
     // Build from parts.
-    EXPECT_EQ(HashId::Builder().Append("test").Build(),
-              HashId::Builder().Append("te").Append("st").Build());
+    EXPECT_EQ(
+        HashId::Builder().Append("test").Build(), HashId::Builder().Append("te").Append("st").Build()
+    );
 }
 
 TEST(HashId, Empty) {

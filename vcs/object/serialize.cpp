@@ -1,6 +1,7 @@
 #include "serialize.h"
 
 #include <vcs/api/fbs/commit.fb.h>
+#include <vcs/api/fbs/index.fb.h>
 #include <vcs/api/fbs/tree.fb.h>
 
 using namespace flatbuffers;
@@ -48,8 +49,9 @@ std::string CommitBuilder::Serialize() {
     }
     if (!this->attributes.empty()) {
         // Sort by name.
-        sort(this->attributes.begin(), this->attributes.end(),
-             [](const auto& a, const auto& b) { return a.name < b.name; });
+        sort(this->attributes.begin(), this->attributes.end(), [](const auto& a, const auto& b) {
+            return a.name < b.name;
+        });
 
         std::vector<Offset<Fbs::Attribute>> tmp;
         for (const auto& attr : this->attributes) {
@@ -81,6 +83,52 @@ std::string CommitBuilder::Serialize() {
     return std::string((const char*)fbb.GetBufferPointer(), fbb.GetSize());
 }
 
+IndexBuilder::IndexBuilder(const HashId& id, const DataType type) noexcept
+    : id_(id)
+    , type_(type) {
+}
+
+IndexBuilder& IndexBuilder::Append(const HashId& id, const uint32_t size) {
+    parts_.push_back(Part{id, size});
+    return *this;
+}
+
+IndexBuilder& IndexBuilder::SetId(const HashId& id) noexcept {
+    id_ = id;
+    return *this;
+}
+
+void IndexBuilder::EnumerateParts(const std::function<void(const HashId&, const uint32_t)>& cb) const {
+    if (!cb) {
+        return;
+    }
+    for (const auto& part : parts_) {
+        cb(part.id, part.size);
+    }
+}
+
+std::string IndexBuilder::Serialize() const {
+    FlatBufferBuilder fbb;
+    std::vector<Offset<Fbs::Part>> parts;
+
+    assert(bool(id_));
+    assert(type_ != DataType::None);
+    assert(type_ != DataType::Index);
+
+    const auto id = fbb.CreateVector(id_.Data(), id_.Size());
+
+    parts.reserve(parts_.size());
+
+    for (const auto& part : parts_) {
+        auto pi = fbb.CreateVector(part.id.Data(), part.id.Size());
+        parts.push_back(Fbs::CreatePart(fbb, pi, part.size));
+    }
+
+    fbb.Finish(Fbs::CreateIndex(fbb, id, Fbs::DataType(type_), fbb.CreateVector(parts)));
+
+    return std::string((const char*)fbb.GetBufferPointer(), fbb.GetSize());
+}
+
 TreeBuilder& TreeBuilder::Append(std::string name, const PathEntry& entry) {
     entries_.emplace_back(std::move(name), entry);
     return *this;
@@ -91,7 +139,8 @@ TreeBuilder& TreeBuilder::Append(const Tree::Entry& entry) {
         // Name.
         entry.Name(),
         // Attributes.
-        PathEntry{.id = entry.Id(), .type = entry.Type(), .size = entry.Size()});
+        PathEntry{.id = entry.Id(), .type = entry.Type(), .size = entry.Size()}
+    );
     return *this;
 }
 
@@ -108,8 +157,9 @@ std::string TreeBuilder::Serialize() {
     }
 
     // Sort entries by name so later we can use binary search for entry lookup.
-    std::sort(entries_.begin(), entries_.end(),
-              [](const auto& a, const auto& b) { return a.first < b.first; });
+    std::sort(entries_.begin(), entries_.end(), [](const auto& a, const auto& b) {
+        return a.first < b.first;
+    });
 
     // Validate entries.
     for (size_t i = 0, end = entries_.size(); i < end; ++i) {

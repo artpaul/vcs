@@ -5,6 +5,7 @@
 #include "path.h"
 
 #include <cassert>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -133,6 +134,9 @@ public:
 
     /** Loads object content. */
     static Object Load(const DataType type, const std::string_view content);
+
+    /** Loads object content. */
+    static Object Load(const DataHeader header, const std::function<void(std::byte* buf, size_t len)>& cb);
 
 public:
     /// Treat object as a blob.

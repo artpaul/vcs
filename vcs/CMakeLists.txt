@@ -48,6 +48,8 @@ target_sources(libvcs3 PRIVATE
     "object/hashid.cpp"
     "object/object.cpp"
     "object/serialize.cpp"
+    "object/store.cpp"
+    "store/memory.cpp"
 )
 
 target_sources(libvcs3 PRIVATE

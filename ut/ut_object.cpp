@@ -1,4 +1,5 @@
 #include <vcs/api/fbs/commit.fb.h>
+#include <vcs/api/fbs/index.fb.h>
 #include <vcs/api/fbs/tree.fb.h>
 #include <vcs/object/object.h>
 #include <vcs/object/serialize.h>
@@ -69,6 +70,25 @@ TEST(ObjectCommit, Serialize) {
     EXPECT_EQ(item->generation(), 1u);
     EXPECT_EQ(item->committer()->when(), 1u);
     EXPECT_EQ(item->message()->str(), "test");
+}
+
+TEST(ObjectIndex, Parts) {
+    const auto id = HashId::Make(DataType::Blob, "");
+    const auto data = IndexBuilder(id, DataType::Blob).Append(HashId(), 5).Append(HashId(), 7).Serialize();
+    const auto item = Fbs::GetIndex(data.data());
+    const auto index = Object::Load(DataType::Index, data).AsIndex();
+
+    /// Serialized form.
+    EXPECT_EQ(FromFlatBuffers(item->id()), id);
+    ASSERT_EQ(item->parts()->size(), 2u);
+    EXPECT_EQ(item->parts()->Get(0)->size(), 5u);
+    EXPECT_EQ(item->parts()->Get(1)->size(), 7u);
+    /// Wrapper.
+    EXPECT_EQ(index.Id(), id);
+    EXPECT_EQ(index.Type(), DataType::Blob);
+    ASSERT_EQ(index.Parts().size(), 2u);
+    EXPECT_EQ(index.Parts()[0].Size(), 5u);
+    EXPECT_EQ(index.Parts()[1].Size(), 7u);
 }
 
 TEST(ObjectTree, EmptyTree) {

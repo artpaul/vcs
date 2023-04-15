@@ -5,9 +5,10 @@ target_sources(libvcs3-ut PRIVATE
 )
 
 target_sources(libvcs3-ut PRIVATE
-    "data_ut.cpp"
-    "hashid_ut.cpp"
-    "object_ut.cpp"
+    "ut_data.cpp"
+    "ut_hashid.cpp"
+    "ut_object.cpp"
+    "ut_store.cpp"
 )
 
 target_link_libraries(libvcs3-ut
