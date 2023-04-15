@@ -26,10 +26,16 @@ function(generate_fbs name)
 endfunction(generate_fbs name)
 
 generate_fbs(commit)
+generate_fbs(index)
 generate_fbs(renames)
 generate_fbs(tag)
 generate_fbs(tree)
 generate_fbs(types)
+
+target_include_directories(libvcs3 SYSTEM PUBLIC
+    # Flatbuffers includes.
+    "${CMAKE_BINARY_DIR}"
+)
 
 target_link_libraries(libvcs3 PUBLIC
     contrib-flatbuffers
@@ -40,15 +46,19 @@ target_link_libraries(libvcs3 PUBLIC
 target_sources(libvcs3 PRIVATE
     "object/data.cpp"
     "object/hashid.cpp"
+    "object/object.cpp"
+    "object/serialize.cpp"
 )
 
 target_sources(libvcs3 PRIVATE
     "${CMAKE_CURRENT_BINARY_DIR}/api/fbs/commit.fb.h"
+    "${CMAKE_CURRENT_BINARY_DIR}/api/fbs/index.fb.h"
     "${CMAKE_CURRENT_BINARY_DIR}/api/fbs/renames.fb.h"
     "${CMAKE_CURRENT_BINARY_DIR}/api/fbs/tag.fb.h"
     "${CMAKE_CURRENT_BINARY_DIR}/api/fbs/tree.fb.h"
     "${CMAKE_CURRENT_BINARY_DIR}/api/fbs/types.fb.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/api/fbs/commit.fbs"
+    "${CMAKE_CURRENT_SOURCE_DIR}/api/fbs/index.fbs"
     "${CMAKE_CURRENT_SOURCE_DIR}/api/fbs/renames.fbs"
     "${CMAKE_CURRENT_SOURCE_DIR}/api/fbs/tag.fbs"
     "${CMAKE_CURRENT_SOURCE_DIR}/api/fbs/tree.fbs"

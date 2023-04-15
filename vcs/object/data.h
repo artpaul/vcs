@@ -31,6 +31,13 @@ enum class DataType : uint8_t {
  */
 class DataHeader {
 public:
+    // |-----------------------------------------------|
+    // |       The layout of packed data header        |
+    // |-----------------------------------------------|
+    // |    1 bit |      3 bit | 4 bit | up to 6 bytes |
+    // |----------|------------|-------|---------------|
+    // | reserved | size bytes | type  |  packed size  |
+    // |-----------------------------------------------|
     union {
         struct {
             uint8_t tag;
