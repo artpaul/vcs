@@ -91,6 +91,37 @@ TEST(ObjectIndex, Parts) {
     EXPECT_EQ(index.Parts()[1].Size(), 7u);
 }
 
+TEST(ObjectRenames, Build) {
+    RenamesBuilder builder;
+    // Add copies.
+    builder.copies.push_back(RenamesBuilder::CopyInfo{HashId::Make(DataType::Commit, ""), "a/b", "a/a/b"});
+    builder.copies.push_back(RenamesBuilder::CopyInfo{HashId(), "a/b", "a/a/a"});
+    builder.copies.push_back(RenamesBuilder::CopyInfo{HashId(), "a/b/c", "a/b/c"});
+    // Add some replaces.
+    builder.replaces.push_back("a/b/c");
+    builder.replaces.push_back("a/b/b");
+    builder.replaces.push_back("x/b/c/d");
+
+    auto renames = Renames::Load(builder.Serialize());
+
+    ASSERT_EQ(renames.Commits().size(), 2u);
+    EXPECT_EQ(renames.Commits()[0], HashId());
+    EXPECT_EQ(renames.Commits()[1], HashId::Make(DataType::Commit, ""));
+
+    ASSERT_EQ(renames.Copies().size(), 3u);
+    EXPECT_EQ(renames.Copies()[0].Path(), "a/a/a");
+    EXPECT_EQ(renames.Copies()[0].CommitId(), HashId());
+    EXPECT_EQ(renames.Copies()[0].Source(), "a/b");
+    EXPECT_EQ(renames.Copies()[1].Path(), "a/a/b");
+    EXPECT_EQ(renames.Copies()[1].CommitId(), HashId::Make(DataType::Commit, ""));
+    EXPECT_EQ(renames.Copies()[1].Source(), "a/b");
+
+    ASSERT_EQ(renames.Replaces().size(), 3u);
+    EXPECT_EQ(renames.Replaces()[0], "a/b/b");
+    EXPECT_EQ(renames.Replaces()[1], "a/b/c");
+    EXPECT_EQ(renames.Replaces()[2], "x/b/c/d");
+}
+
 TEST(ObjectTree, EmptyTree) {
     const auto& tree = Tree::Load(TreeBuilder().Serialize());
 

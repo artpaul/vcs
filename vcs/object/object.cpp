@@ -2,6 +2,7 @@
 
 #include <vcs/api/fbs/commit.fb.h>
 #include <vcs/api/fbs/index.fb.h>
+#include <vcs/api/fbs/renames.fb.h>
 #include <vcs/api/fbs/tree.fb.h>
 
 #include <contrib/fmt/fmt/compile.h>
@@ -74,8 +75,6 @@ Object Object::Load(const DataHeader header, const std::function<void(std::byte*
     return Object(std::move(buf));
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 Blob Object::AsBlob() const {
     ValidateTypecast<DataType::Blob>(data_, "blob");
     return Blob(data_);
@@ -89,6 +88,11 @@ Commit Object::AsCommit() const {
 Index Object::AsIndex() const {
     ValidateTypecast<DataType::Index>(data_, "index");
     return Index(data_);
+}
+
+Renames Object::AsRenames() const {
+    ValidateTypecast<DataType::Renames>(data_, "renames");
+    return Renames(data_);
 }
 
 Tree Object::AsTree() const {
@@ -107,6 +111,8 @@ uint64_t Object::Size() const noexcept {
 DataType Object::Type() const noexcept {
     return data_ ? DataType(Adaptor::GetTag(data_.get())->type) : DataType::None;
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 Blob::Blob(const std::shared_ptr<std::byte[]>& data) noexcept
     : ObjectBase(data) {
@@ -309,6 +315,107 @@ DataType Index::Type() const {
 
 RepeatedField<Index::Part, Index::RangeParts> Index::Parts() const {
     return RepeatedField<Part, RangeParts>(Fbs::GetIndex(Adaptor::GetData(data_.get()))->parts());
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+constexpr Renames::CopyInfo::CopyInfo(const void* p, const size_t i) noexcept
+    : p_(p)
+    , i_(i) {
+}
+
+HashId Renames::CopyInfo::CommitId() const {
+    const auto copy = Fbs::GetRenames(p_)->copies()->GetAs<Fbs::CopyInfo>(i_);
+
+    if (copy->sources()->size() == 0) {
+        return HashId();
+    }
+
+    const auto idx = copy->sources()->GetAs<Fbs::CommitPath>(0)->commit();
+
+    if (Fbs::GetRenames(p_)->commits()->size() >= 20 * (idx + 1)) {
+        return HashId::FromBytes(Fbs::GetRenames(p_)->commits()->data() + (20 * idx), 20);
+    } else {
+        return HashId();
+    }
+}
+
+std::string_view Renames::CopyInfo::Source() const {
+    const auto copy = Fbs::GetRenames(p_)->copies()->GetAs<Fbs::CopyInfo>(i_);
+
+    if (copy->sources()->size() == 0) {
+        return std::string_view();
+    }
+    if (const auto path = copy->sources()->GetAs<Fbs::CommitPath>(0)->path()) {
+        return std::string_view(path->data(), path->size());
+    }
+
+    return std::string_view();
+}
+
+std::string_view Renames::CopyInfo::Path() const {
+    if (const auto path = Fbs::GetRenames(p_)->copies()->GetAs<Fbs::CopyInfo>(i_)->path()) {
+        return std::string_view(path->data(), path->size());
+    }
+    return std::string_view();
+}
+
+Renames::CopyInfo Renames::RangeCopyInfo::Item(const void* p, size_t i) {
+    return CopyInfo(p, i);
+}
+
+size_t Renames::RangeCopyInfo::Size(const void* p) {
+    return Fbs::GetRenames(p)->copies()->size();
+}
+
+HashId Renames::RangeCommits::Item(const void* p, size_t i) {
+    return HashId::FromBytes(static_cast<const flatbuffers::Vector<uint8_t>*>(p)->data() + (20 * i), 20);
+}
+
+size_t Renames::RangeCommits::Size(const void* p) {
+    return static_cast<const flatbuffers::Vector<uint8_t>*>(p)->size() / 20;
+}
+
+std::string_view Renames::RangeReplaces::Item(const void* p, size_t i) {
+    const auto s =
+        static_cast<const flatbuffers::Vector<::flatbuffers::Offset<::flatbuffers::String>>*>(p)->Get(i);
+
+    if (s) {
+        return std::string_view(s->data(), s->size());
+    }
+
+    return std::string_view();
+}
+
+size_t Renames::RangeReplaces::Size(const void* p) {
+    return static_cast<const flatbuffers::Vector<flatbuffers::String>*>(p)->size();
+}
+
+Renames Renames::Load(const std::string_view data) {
+    return Object::Load(DataType::Renames, data).AsRenames();
+}
+
+RepeatedField<HashId, Renames::RangeCommits> Renames::Commits() const {
+    return RepeatedField<HashId, RangeCommits>(Fbs::GetRenames(Adaptor::GetData(data_.get()))->commits());
+}
+
+RepeatedField<Renames::CopyInfo, Renames::RangeCopyInfo> Renames::Copies() const {
+    if (Fbs::GetRenames(Adaptor::GetData(data_.get()))->copies()) {
+        return RepeatedField<CopyInfo, RangeCopyInfo>(Adaptor::GetData(data_.get()));
+    } else {
+        return RepeatedField<CopyInfo, RangeCopyInfo>(nullptr);
+    }
+}
+
+RepeatedField<std::string_view, Renames::RangeReplaces> Renames::Replaces() const {
+    return RepeatedField<std::string_view, RangeReplaces>(
+        Fbs::GetRenames(Adaptor::GetData(data_.get()))->replaces()
+    );
+}
+
+Renames::Renames(const std::shared_ptr<std::byte[]>& data) noexcept
+    : ObjectBase(data) {
+    assert(data_);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////

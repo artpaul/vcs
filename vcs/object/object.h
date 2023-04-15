@@ -148,6 +148,9 @@ public:
     /// Treat object as an index.
     Index AsIndex() const;
 
+    /// Treat object as a rename table.
+    Renames AsRenames() const;
+
     /// Treat object as a tree.
     Tree AsTree() const;
 
@@ -308,8 +311,68 @@ public:
     /// Range of an object parts.
     RepeatedField<Part, RangeParts> Parts() const;
 
+    /// Makes DataHeader.
+    explicit operator DataHeader() const {
+        return DataHeader::Make(Type(), Size());
+    }
+
 private:
     Index(const std::shared_ptr<std::byte[]>& data) noexcept;
+};
+
+class Renames final : public ObjectBase<Renames> {
+    friend class Object;
+
+public:
+    class CopyInfo {
+    public:
+        explicit constexpr CopyInfo(const void* p, const size_t i) noexcept;
+
+        /// Source revision.
+        HashId CommitId() const;
+
+        /// Source path.
+        std::string_view Source() const;
+
+        /// Target path.
+        std::string_view Path() const;
+
+    private:
+        const void* const p_;
+        const size_t i_;
+    };
+
+    struct RangeCommits {
+        static HashId Item(const void* p, size_t i);
+        static size_t Size(const void* p);
+    };
+
+    struct RangeCopyInfo {
+        static CopyInfo Item(const void* p, size_t i);
+        static size_t Size(const void* p);
+    };
+
+    struct RangeReplaces {
+        static std::string_view Item(const void* p, size_t i);
+        static size_t Size(const void* p);
+    };
+
+public:
+    /// Loads renames object from memory buffer.
+    static Renames Load(const std::string_view data);
+
+public:
+    /// Dense list of source commits.
+    RepeatedField<HashId, RangeCommits> Commits() const;
+
+    /// List of copied entries.
+    RepeatedField<CopyInfo, RangeCopyInfo> Copies() const;
+
+    /// List of replaced entries.
+    RepeatedField<std::string_view, RangeReplaces> Replaces() const;
+
+private:
+    Renames(const std::shared_ptr<std::byte[]>& data) noexcept;
 };
 
 /**

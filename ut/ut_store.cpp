@@ -1,3 +1,4 @@
+#include <vcs/object/serialize.h>
 #include <vcs/store/memory.h>
 
 #include <contrib/gtest/gtest.h>
@@ -58,7 +59,7 @@ TEST(MemoryStore, Capacity) {
     }
 }
 
-TEST(MemoryStore, ChunkSize) {
+TEST(MemoryStore, BlobChunked) {
     std::string content(text);
     // Make a big string.
     for (size_t i = 0, end = 10; i < end; ++i) {
@@ -88,4 +89,23 @@ TEST(MemoryStore, ChunkSize) {
         EXPECT_EQ(mem.LoadIndex(id).Size(), content.size());
         EXPECT_EQ(std::string_view(mem.LoadBlob(id)), content);
     }
+}
+
+TEST(MemoryStore, TreeChunked) {
+    TreeBuilder builder;
+
+    for (size_t i = 0; i < 100; ++i) {
+        builder.Append(
+            "entry" + std::to_string(i),
+            PathEntry{.id = HashId::Make(DataType::Blob, "abcde"), .type = PathType::File, .size = 5}
+        );
+    }
+
+    MemoryStore mem(1 << 20, 512);
+    const auto id = mem.Put(DataType::Tree, builder.Serialize());
+
+    ASSERT_TRUE(mem.IsExists(id));
+    ASSERT_EQ(mem.GetType(id), DataType::Index);
+    EXPECT_EQ(mem.LoadIndex(id).Type(), DataType::Tree);
+    EXPECT_EQ(mem.LoadTree(id).Entries().size(), 100u);
 }

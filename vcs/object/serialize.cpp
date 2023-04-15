@@ -2,6 +2,7 @@
 
 #include <vcs/api/fbs/commit.fb.h>
 #include <vcs/api/fbs/index.fb.h>
+#include <vcs/api/fbs/renames.fb.h>
 #include <vcs/api/fbs/tree.fb.h>
 
 using namespace flatbuffers;
@@ -83,6 +84,8 @@ std::string CommitBuilder::Serialize() {
     return std::string((const char*)fbb.GetBufferPointer(), fbb.GetSize());
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 IndexBuilder::IndexBuilder(const HashId& id, const DataType type) noexcept
     : id_(id)
     , type_(type) {
@@ -128,6 +131,77 @@ std::string IndexBuilder::Serialize() const {
 
     return std::string((const char*)fbb.GetBufferPointer(), fbb.GetSize());
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+std::string RenamesBuilder::Serialize() {
+    FlatBufferBuilder fbb;
+
+    Offset<Vector<uint8_t>> commits = 0;
+    Offset<Vector<Offset<Fbs::CopyInfo>>> copies = 0;
+    Offset<Vector<Offset<String>>> replaces = 0;
+
+    if (this->copies.size()) {
+        std::vector<HashId> ids;
+
+        // Sort by target path.
+        std::sort(this->copies.begin(), this->copies.end(), [](const auto& a, const auto& b) {
+            return a.path < b.path;
+        });
+        // Collect commits.
+        for (const auto& copy : this->copies) {
+            if (ids.empty() || ids.back() != copy.commit) {
+                ids.push_back(copy.commit);
+            }
+        }
+        // Sort commits.
+        std::sort(ids.begin(), ids.end());
+        // Remove duplicates.
+        ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
+
+        std::vector<Offset<Fbs::CopyInfo>> tmp;
+        std::vector<Offset<Fbs::CommitPath>> sources;
+        // Make commits.
+        {
+            const size_t size = ids[0].Size();
+            std::vector<uint8_t> data(ids.size() * size);
+            for (size_t i = 0; i < ids.size(); ++i) {
+                std::memcpy(data.data() + i * size, ids[i].Data(), size);
+            }
+            commits = fbb.CreateVector(data);
+        }
+        // Make copies.
+        for (const auto& copy : this->copies) {
+            sources.assign({Fbs::CreateCommitPath(
+                fbb, std::lower_bound(ids.begin(), ids.end(), copy.commit) - ids.begin(),
+                fbb.CreateString(copy.source)
+            )});
+
+            tmp.push_back(Fbs::CreateCopyInfo(fbb, fbb.CreateString(copy.path), fbb.CreateVector(sources)));
+        }
+        copies = fbb.CreateVector(tmp);
+    }
+    if (this->replaces.size()) {
+        // Sort by target path.
+        sort(this->replaces.begin(), this->replaces.end(), [](const auto& a, const auto& b) {
+            return a < b;
+        });
+
+        std::vector<Offset<String>> tmp;
+        tmp.reserve(this->replaces.size());
+        for (const auto& path : this->replaces) {
+            assert(!path.empty());
+            tmp.push_back(fbb.CreateString(path));
+        }
+        replaces = fbb.CreateVector(tmp);
+    }
+
+    fbb.Finish(Fbs::CreateRenames(fbb, commits, copies, replaces));
+
+    return std::string((const char*)fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 TreeBuilder& TreeBuilder::Append(std::string name, const PathEntry& entry) {
     entries_.emplace_back(std::move(name), entry);

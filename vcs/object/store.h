@@ -13,29 +13,19 @@ public:
 
 public:
     /// Returns metadata for an object with the given id.
-    DataHeader GetMeta(const HashId& id) const {
-        return DoGetMeta(id);
-    }
+    DataHeader GetMeta(const HashId& id, bool resolve = false) const;
 
     /// Returns type of an object with the given id.
-    DataType GetType(const HashId& id) const {
-        return DoGetMeta(id).Type();
-    }
+    DataType GetType(const HashId& id, bool resolve = false) const;
 
     /// Checks whether an object with the id exists in the store.
-    bool IsExists(const HashId& id) const {
-        return DoIsExists(id);
-    }
+    bool IsExists(const HashId& id) const;
 
     /// Loads object.
-    Object Load(const HashId& id) const {
-        return DoLoad(id, DataType::None);
-    }
+    Object Load(const HashId& id) const;
 
     /// Loads object.
-    Object Load(const HashId& id, DataType expected) const {
-        return DoLoad(id, expected);
-    }
+    Object Load(const HashId& id, DataType expected) const;
 
     /// Loads blob object.
     Blob LoadBlob(const HashId& id) const;
@@ -45,6 +35,9 @@ public:
 
     /// Loads index object.
     Index LoadIndex(const HashId& id) const;
+
+    /// Loads renames object.
+    Renames LoadRenames(const HashId& id) const;
 
     /// Loads tree object.
     Tree LoadTree(const HashId& id) const;

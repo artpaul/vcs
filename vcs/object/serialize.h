@@ -94,6 +94,33 @@ private:
 };
 
 /**
+ * Serialize renames object into FlatBuffers format.
+ */
+class RenamesBuilder {
+public:
+    struct CopyInfo {
+        /// Source revision.
+        HashId commit;
+        /// Source path.
+        std::string source;
+        /// Target path.
+        std::string path;
+
+        bool IsEmpty() const noexcept {
+            return path.empty() || source.empty() || !bool(commit);
+        }
+    };
+
+    /// List of copied entries.
+    std::vector<CopyInfo> copies;
+    /// List of replaced entries.
+    std::vector<std::string> replaces;
+
+public:
+    std::string Serialize();
+};
+
+/**
  * Serialize tree object into FlatBuffers format.
  */
 class TreeBuilder {

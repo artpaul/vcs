@@ -30,6 +30,32 @@ Datastore::Datastore(const size_t chunk_size) noexcept
     : chunk_size_(chunk_size) {
 }
 
+DataHeader Datastore::GetMeta(const HashId& id, bool resolve) const {
+    const auto meta = DoGetMeta(id);
+
+    if (resolve && meta.Type() == DataType::Index) {
+         return static_cast<DataHeader>(LoadIndex(id));
+    } else {
+        return meta;
+    }
+}
+
+DataType Datastore::GetType(const HashId& id, bool resolve) const {
+    return GetMeta(id, resolve).Type();
+}
+
+bool Datastore::IsExists(const HashId& id) const {
+    return DoIsExists(id);
+}
+
+Object Datastore::Load(const HashId& id) const {
+    return DoLoad(id, DataType::None);
+}
+
+Object Datastore::Load(const HashId& id, DataType expected) const {
+    return DoLoad(id, expected);
+}
+
 Blob Datastore::LoadBlob(const HashId& id) const {
     const auto obj = DoLoad(id, DataType::Blob);
 
@@ -52,6 +78,16 @@ Commit Datastore::LoadCommit(const HashId& id) const {
 
 Index Datastore::LoadIndex(const HashId& id) const {
     return DoLoad(id, DataType::Index).AsIndex();
+}
+
+Renames Datastore::LoadRenames(const HashId& id) const {
+    const auto obj = DoLoad(id, DataType::Renames);
+
+    if (obj.Type() == DataType::Index) {
+        return ConstructObjectFromIndex(obj.AsIndex(), this).AsRenames();
+    } else {
+        return obj.AsRenames();
+    }
 }
 
 Tree Datastore::LoadTree(const HashId& id) const {
