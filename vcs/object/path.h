@@ -32,4 +32,16 @@ static_assert(sizeof(PathEntry) == 32);
 /// Ensure the value of PathEntry is memcpy copyable.
 static_assert(std::is_trivially_copyable<PathEntry>::value);
 
+inline constexpr bool IsFile(const PathType type) noexcept {
+    return type == PathType::File || type == PathType::Executible;
+}
+
+inline constexpr bool IsDirectory(const PathType type) noexcept {
+    return type == PathType::Directory;
+}
+
+inline constexpr bool IsSymlink(const PathType type) noexcept {
+    return type == PathType::Symlink;
+}
+
 } // namespace Vcs

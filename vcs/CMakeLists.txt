@@ -41,6 +41,7 @@ target_link_libraries(libvcs3 PUBLIC
     contrib-flatbuffers
     contrib-fmt
     contrib-sha
+    vcs-util
 )
 
 target_sources(libvcs3 PRIVATE
@@ -50,6 +51,7 @@ target_sources(libvcs3 PRIVATE
     "object/serialize.cpp"
     "object/store.cpp"
     "store/memory.cpp"
+    "stage.cpp"
 )
 
 target_sources(libvcs3 PRIVATE
