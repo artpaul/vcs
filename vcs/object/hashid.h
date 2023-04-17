@@ -52,7 +52,7 @@ public:
     static HashId Make(const DataType type, const std::string_view content);
 
 public:
-    const unsigned char* Data() const noexcept {
+    constexpr auto Data() const noexcept -> const unsigned char (&)[20] {
         return data_;
     }
 
@@ -102,6 +102,9 @@ static_assert(std::is_trivially_copyable<HashId>::value);
 
 /// Ensure HashId is 32-bit aligned.
 static_assert(std::alignment_of<HashId>::value == std::alignment_of<uint32_t>::value);
+
+/// Ensure HashId::Data() returns pointer to an array of fixed size.
+static_assert(std::is_bounded_array_v<std::remove_reference_t<decltype(HashId().Data())>>);
 
 } // namespace Vcs
 
