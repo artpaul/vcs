@@ -7,15 +7,28 @@
 
 namespace Vcs {
 
+enum class PathAction : uint8_t {
+    /// Nothing to do.
+    None = 0,
+    /// Add entry to a tree.
+    Add = 1,
+    /// Update entry.
+    Change = 2,
+    /// Remove entry from a tree.
+    Delete = 3,
+};
+
 enum class PathType : uint8_t {
+    /// Path type is unknown or unspecified.
+    Unknown = 0,
     /// A regular file.
-    File = 0,
+    File = 1,
     /// A directory.
-    Directory = 1,
+    Directory = 2,
     /// A file with the execute permission.
-    Executible = 2,
+    Executible = 3,
     /// A symbolic link.
-    Symlink = 3,
+    Symlink = 4,
 };
 
 struct PathEntry {

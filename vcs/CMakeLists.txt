@@ -51,6 +51,7 @@ target_sources(libvcs3 PRIVATE
     "object/serialize.cpp"
     "object/store.cpp"
     "store/memory.cpp"
+    "changelist.cpp"
     "stage.cpp"
 )
 

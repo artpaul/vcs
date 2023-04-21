@@ -1,17 +1,19 @@
 namespace Fbs;
 
 enum PathType : uint8 {
+    Unknown = 0,
+
     /// A regular file.
-    File = 0,
+    File = 1,
 
     /// A directory.
-    Directory = 1,
+    Directory = 2,
 
     /// A file with the execute permission.
-    Executible = 2,
+    Executible = 3,
 
     /// A symbolic link.
-    Symlink = 3,
+    Symlink = 4,
 }
 
 table TreeEntry {
