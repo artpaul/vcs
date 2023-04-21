@@ -1,6 +1,18 @@
+#include <vcs/util/arena.h>
 #include <vcs/util/split.h>
 
 #include <contrib/gtest/gtest.h>
+
+TEST(Utils, Arena) {
+    Arena arena(1024);
+
+    // Allocate some bytes.
+    ASSERT_TRUE(arena.Allocate(5));
+    // Allocate some bytes at aligned address.
+    ASSERT_EQ(reinterpret_cast<uintptr_t>(arena.Allocate(10, 16)) & 15, 0u);
+    // Force creation of a new chunk.
+    ASSERT_TRUE(arena.Allocate(2048));
+}
 
 TEST(Utils, SplitPath) {
     const auto check_abc = [](const std::vector<std::string_view>& parts) {
