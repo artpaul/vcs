@@ -33,10 +33,11 @@ public:
 
 public:
     /// List all entries.
-    void ForEach(std::function<void(const std::string& name, const Entry&)> cb) const;
+    void ForEach(const std::function<void(const std::string& name, const Entry&)>& cb, bool removed = false)
+        const;
 
     /// Find entry by name.
-    Entry* Find(const std::string_view name);
+    Entry* Find(const std::string_view name, bool removed = false);
 
     /// Insert directory entry with the given name.
     Directory* MakeDirectory(const std::string_view name);
@@ -65,15 +66,21 @@ auto StageArea::Directory::FromTree(const Tree& tree) -> std::unique_ptr<Directo
     return dir;
 }
 
-void StageArea::Directory::ForEach(std::function<void(const std::string& name, const Entry&)> cb) const {
+void StageArea::Directory::ForEach(
+    const std::function<void(const std::string& name, const Entry&)>& cb, bool removed
+) const {
     for (const auto& item : entries_) {
-        cb(item.first, item.second);
+        if (item.second.action != Action::Remove || removed) {
+            cb(item.first, item.second);
+        }
     }
 }
 
-auto StageArea::Directory::Find(const std::string_view name) -> Entry* {
+auto StageArea::Directory::Find(const std::string_view name, bool removed) -> Entry* {
     if (auto ei = entries_.find(name); ei != entries_.end()) {
-        return &ei->second;
+        if (ei->second.action != Action::Remove || removed) {
+            return &ei->second;
+        }
     }
     return nullptr;
 }
@@ -81,9 +88,6 @@ auto StageArea::Directory::Find(const std::string_view name) -> Entry* {
 auto StageArea::Directory::MakeDirectory(const std::string_view name) -> Directory* {
     auto ei = entries_.find(name);
     if (ei != entries_.end()) {
-        if (ei->second.action != Action::Remove && ei->second.directory) {
-            return ei->second.directory.get();
-        }
         // Cleanup previous state.
         ei->second.id = HashId();
         ei->second.size = 0;
@@ -158,12 +162,7 @@ std::optional<PathEntry> StageArea::GetEntry(const std::string_view path, bool r
     Directory* cur = stage_root_.get();
 
     for (size_t i = 0, end = parts.size(); i < end; ++i) {
-        if (const auto e = cur->Find(parts[i])) {
-            // Stop walking if the current entry was removed and one
-            // didn't ask for removed entries.
-            if (e->action == Directory::Action::Remove && !removed) {
-                return std::nullopt;
-            }
+        if (const auto e = cur->Find(parts[i], removed)) {
             if (i + 1 == parts.size()) {
                 return PathEntry{.id = e->id, .type = e->type, .size = e->size};
             } else if (e->directory) {
@@ -189,15 +188,12 @@ std::vector<std::pair<std::string, PathEntry>> StageArea::ListTree(
     auto list_directory_entries = [&](const Directory* d) {
         std::vector<std::pair<std::string, PathEntry>> entries;
 
-        d->ForEach([&](const std::string& name, const Directory::Entry& e) {
-            // Don't add the current entry if it was removed and one
-            // didn't ask for removed entries.
-            if (e.action == Directory::Action::Remove && !removed) {
-                return;
-            }
-
-            entries.emplace_back(name, PathEntry{.id = e.id, .type = e.type, .size = e.size});
-        });
+        d->ForEach(
+            [&](const std::string& name, const Directory::Entry& e) {
+                entries.emplace_back(name, PathEntry{.id = e.id, .type = e.type, .size = e.size});
+            },
+            removed
+        );
 
         return entries;
     };
@@ -233,12 +229,7 @@ std::vector<std::pair<std::string, PathEntry>> StageArea::ListTree(
     Directory* cur = stage_root_.get();
 
     for (size_t i = 0, end = parts.size(); i < end; ++i) {
-        if (const auto e = cur->Find(parts[i])) {
-            // Stop walking if the current entry was removed and one
-            // didn't ask for removed entries.
-            if (e->action == Directory::Action::Remove && !removed) {
-                break;
-            }
+        if (const auto e = cur->Find(parts[i], removed)) {
             if (i + 1 == end) {
                 if (e->directory) {
                     return list_directory_entries(e->directory.get());
@@ -266,15 +257,9 @@ bool StageArea::Remove(const std::string_view path) {
 
     for (size_t i = 0, end = parts.size(); i < end; ++i) {
         if (i + 1 == end) {
-            if (cur->Remove(parts[i])) {
-                return true;
-            }
+            return cur->Remove(parts[i]);
         }
         if (const auto e = cur->Find(parts[i])) {
-            // Stop walking if the entry has been already removed.
-            if (e->action == Directory::Action::Remove) {
-                return false;
-            }
             if (e->directory) {
                 cur = e->directory.get();
             } else if (IsDirectory(e->type)) {
@@ -317,16 +302,9 @@ bool StageArea::AddImpl(const std::string_view path, const PathEntry& entry, Dir
                     e->directory = Directory::MakeEmpty();
                 }
                 root = e->directory.get();
-            } else if (e->action == Directory::Action::Remove) {
-                // An entry was removed, so it's safe to replace it
-                // with an empty directory.
-                root = root->MakeDirectory(parts[i]);
             } else {
+                // Reset type of the entry.
                 root = root->MakeDirectory(parts[i]);
-            }
-            // Reset possible removes.
-            if (e->action == Directory::Action::Remove) {
-                e->action = Directory::Action::Add;
             }
         } else if (i + 1 == end) {
             return root->Upsert(parts[i], entry);
@@ -383,9 +361,6 @@ HashId StageArea::SaveTreeImpl(const Directory* root, Datastore* odb) const {
     root->ForEach([&](const std::string& name, const Directory::Entry& e) {
         PathEntry entry;
 
-        if (e.action == Directory::Action::Remove) {
-            return;
-        }
         if (e.directory) {
             entry.id = SaveTreeImpl(e.directory.get(), odb);
             entry.type = PathType::Directory;

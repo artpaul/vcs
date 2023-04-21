@@ -100,14 +100,17 @@ TEST(StageArea, RestoreRemoved) {
     MemoryStore mem;
     StageArea index(&mem, MakeLibTree(&mem));
 
-    ASSERT_TRUE(index.Remove("lib/test.h"));
     ASSERT_TRUE(index.Remove("lib"));
     EXPECT_FALSE(index.GetEntry("lib"));
+    EXPECT_FALSE(index.GetEntry("lib/test.h"));
     EXPECT_TRUE(index.GetEntry("lib", true));
     EXPECT_TRUE(index.GetEntry("lib/test.h", true));
 
-    ASSERT_TRUE(index.Add("lib/test.h", MakeBlob("int test();", &mem)));
+    ASSERT_TRUE(index.Add("lib/test.cpp", MakeBlob("int test();", &mem)));
     EXPECT_TRUE(index.GetEntry("lib"));
+    EXPECT_TRUE(index.GetEntry("lib/test.cpp"));
+    // Entries from the state prior delete should not reappear.
+    EXPECT_FALSE(index.GetEntry("lib/test.h"));
 
     ASSERT_TRUE(index.Remove("test"));
     EXPECT_TRUE(index.GetEntry("test", true));
@@ -123,6 +126,28 @@ TEST(StageArea, SaveTree) {
     ASSERT_TRUE(index.Add("test", MakeBlob("", &mem)));
 
     ASSERT_TRUE(index.SaveTree(&mem));
+}
+
+TEST(StageArea, SaveTreeUpdate) {
+    MemoryStore mem;
+    HashId tree_id;
+
+    {
+        StageArea index(&mem, MakeLibTree(&mem));
+
+        ASSERT_TRUE(index.Remove("lib/test.h"));
+        ASSERT_TRUE(index.Add("test", MakeBlob("", &mem)));
+        ASSERT_TRUE(index.Add("lib/test/empty", MakeBlob("", &mem)));
+
+        tree_id = index.SaveTree(&mem);
+    }
+
+    ASSERT_TRUE(tree_id);
+
+    StageArea index(&mem, tree_id);
+
+    EXPECT_TRUE(index.GetEntry("lib/test/empty"));
+    EXPECT_FALSE(index.GetEntry("lib/test.h"));
 }
 
 TEST(StageArea, SaveTreeChunked) {
