@@ -26,6 +26,7 @@ add_subdirectory(vcs/util)
 # Tests.
 if(BUILD_TESTS)
     add_subdirectory(contrib/gtest)
+    add_subdirectory(contrib/benchmark)
     add_subdirectory(ut)
 
     # Local test projects.
