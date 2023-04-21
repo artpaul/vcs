@@ -1,0 +1,6 @@
+add_definitions(-DNO_VIZ -DSTDC -DNO_GZIP)
+file(GLOB SRC_ZLIB "*.c" "*.h")
+list(SORT SRC_ZLIB)
+include_directories(".")
+set_source_files_properties(${SRC_ZLIB} PROPERTIES COMPILE_FLAGS "-Wno-deprecated-non-prototype")
+add_library(contrib-zlib STATIC ${SRC_ZLIB})
