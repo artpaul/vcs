@@ -93,6 +93,14 @@ HashId HashId::FromBytes(const std::string_view data) {
     return FromBytes(data.data(), data.size());
 }
 
+HashId HashId::FromBytes(const unsigned char (&data)[20]) noexcept {
+    static_assert(sizeof(data) == sizeof(data_));
+
+    HashId id;
+    std::memcpy(id.data_, data, sizeof(data));
+    return id;
+}
+
 HashId HashId::FromHex(const std::string_view hex) {
     if (hex.size() != 2 * sizeof(data_)) {
         throw std::invalid_argument(fmt::format("invalid size of hex string '{}'", hex.size()));

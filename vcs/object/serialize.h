@@ -11,7 +11,8 @@ namespace Vcs {
 /**
  * Serialize commit object into FlatBuffers format.
  */
-struct CommitBuilder {
+class CommitBuilder {
+public:
     struct Attribute {
         /// Name of the attribute.
         std::string name;

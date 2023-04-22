@@ -27,6 +27,20 @@ TEST(HashId, Empty) {
     EXPECT_FALSE(bool(HashId()));
 }
 
+TEST(HashId, FromBytes) {
+    constexpr unsigned char data[20] = {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255};
+    constexpr std::string_view hex = "01000000000000000000000000000000000000ff";
+
+    // Range of raw bytes.
+    EXPECT_EQ(HashId::FromBytes(data, sizeof(data)).ToHex(), hex);
+    // String of raw bytes.
+    EXPECT_EQ(
+        HashId::FromBytes(std::string_view(reinterpret_cast<const char*>(data), sizeof(data))).ToHex(), hex
+    );
+    // Fixed size array of raw bytes.
+    EXPECT_EQ(HashId::FromBytes(data).ToHex(), hex);
+}
+
 TEST(HashId, FromHex) {
     EXPECT_EQ(MakeHashId(STR_TEST), HashId::FromHex(STR_HEX_ID));
     EXPECT_EQ(HashId::FromHex(STR_HEX_ID).ToHex(), STR_HEX_ID);

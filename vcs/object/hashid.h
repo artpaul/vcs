@@ -39,6 +39,9 @@ public:
     /** Copies hash data from the provided location. */
     static HashId FromBytes(const std::string_view data);
 
+    /** Copies hash data from the provided location. */
+    static HashId FromBytes(const unsigned char (&data)[20]) noexcept;
+
     /** Parse hex representation of the id. */
     static HashId FromHex(const std::string_view hex);
 

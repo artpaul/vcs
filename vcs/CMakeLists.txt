@@ -40,6 +40,7 @@ target_include_directories(libvcs3 SYSTEM PUBLIC
 target_link_libraries(libvcs3 PUBLIC
     contrib-flatbuffers
     contrib-fmt
+    contrib-libgit2
     contrib-sha
     vcs-util
 )
@@ -47,6 +48,9 @@ target_link_libraries(libvcs3 PUBLIC
 target_sources(libvcs3 PRIVATE
     "changes/changelist.cpp"
     "changes/stage.cpp"
+    "changes/validate.cpp"
+    "git/converter.cpp"
+    "object/commit.cpp"
     "object/data.cpp"
     "object/hashid.cpp"
     "object/object.cpp"
