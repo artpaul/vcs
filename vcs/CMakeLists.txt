@@ -45,14 +45,14 @@ target_link_libraries(libvcs3 PUBLIC
 )
 
 target_sources(libvcs3 PRIVATE
+    "changes/changelist.cpp"
+    "changes/stage.cpp"
     "object/data.cpp"
     "object/hashid.cpp"
     "object/object.cpp"
     "object/serialize.cpp"
     "object/store.cpp"
     "store/memory.cpp"
-    "changelist.cpp"
-    "stage.cpp"
 )
 
 target_sources(libvcs3 PRIVATE

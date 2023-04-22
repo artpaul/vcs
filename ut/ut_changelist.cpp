@@ -1,5 +1,5 @@
-#include <vcs/changelist.h>
-#include <vcs/stage.h>
+#include <vcs/changes/changelist.h>
+#include <vcs/changes/stage.h>
 #include <vcs/store/memory.h>
 
 #include <contrib/gtest/gtest.h>
