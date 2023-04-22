@@ -49,10 +49,11 @@ public:
      * Builds tree.
      *
      * @param odb data storage where all new tree objects will be put.
+     * @param save_empty_directory save empty directories.
      *
      * @return root hash of created tree.
      */
-    HashId SaveTree(Datastore* odb) const;
+    HashId SaveTree(Datastore* odb, bool save_empty_directories = true) const;
 
 private:
     bool AddImpl(const std::string_view path, const PathEntry& entry, Directory* root);
@@ -65,7 +66,7 @@ private:
 
     Directory* MutableRoot();
 
-    HashId SaveTreeImpl(const Directory* root, Datastore* odb) const;
+    HashId SaveTreeImpl(const Directory* root, Datastore* odb, bool save_empty_directory) const;
 
 private:
     const Datastore* odb_;

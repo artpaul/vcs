@@ -1,3 +1,4 @@
+#include <vcs/object/path.h>
 #include <vcs/stage.h>
 #include <vcs/store/memory.h>
 
@@ -128,6 +129,22 @@ TEST(StageArea, SaveTree) {
     ASSERT_TRUE(index.SaveTree(&mem));
 }
 
+TEST(StageArea, SaveTreeEmpty) {
+    MemoryStore mem;
+    StageArea index(&mem);
+
+    // Root tree is always valid.
+    ASSERT_TRUE(index.SaveTree(&mem));
+
+    ASSERT_TRUE(index.Add("lib/test.h", MakeBlob("int test();", &mem)));
+    ASSERT_TRUE(index.Add("empty", PathEntry{.type = PathType::Directory}));
+
+    // Empty directory was saved.
+    ASSERT_TRUE(StageArea(&mem, index.SaveTree(&mem)).GetEntry("empty"));
+    // Empty directory was not saved.
+    ASSERT_FALSE(StageArea(&mem, index.SaveTree(&mem, false)).GetEntry("empty"));
+}
+
 TEST(StageArea, SaveTreeUpdate) {
     MemoryStore mem;
     HashId tree_id;
@@ -138,6 +155,7 @@ TEST(StageArea, SaveTreeUpdate) {
         ASSERT_TRUE(index.Remove("lib/test.h"));
         ASSERT_TRUE(index.Add("test", MakeBlob("", &mem)));
         ASSERT_TRUE(index.Add("lib/test/empty", MakeBlob("", &mem)));
+        ASSERT_TRUE(index.Add("empty", PathEntry{.type = PathType::Directory}));
 
         tree_id = index.SaveTree(&mem);
     }
@@ -146,6 +164,8 @@ TEST(StageArea, SaveTreeUpdate) {
 
     StageArea index(&mem, tree_id);
 
+    ASSERT_TRUE(index.GetEntry("empty"));
+    EXPECT_TRUE(IsDirectory(index.GetEntry("empty")->type));
     EXPECT_TRUE(index.GetEntry("lib/test/empty"));
     EXPECT_FALSE(index.GetEntry("lib/test.h"));
 }

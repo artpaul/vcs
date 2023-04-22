@@ -276,11 +276,13 @@ bool StageArea::Remove(const std::string_view path) {
     return false;
 }
 
-HashId StageArea::SaveTree(Datastore* odb) const {
-    if (stage_root_) {
-        return SaveTreeImpl(stage_root_.get(), odb);
+HashId StageArea::SaveTree(Datastore* odb, bool save_empty_directories) const {
+    const auto id = stage_root_ ? SaveTreeImpl(stage_root_.get(), odb, save_empty_directories) : tree_id_;
+    // Ensure return value is always points to existed tree object.
+    if (id) {
+        return id;
     } else {
-        return tree_id_;
+        return odb->Put(DataType::Tree, TreeBuilder().Serialize());
     }
 }
 
@@ -355,17 +357,25 @@ StageArea::Directory* StageArea::MutableRoot() {
     }
 }
 
-HashId StageArea::SaveTreeImpl(const Directory* root, Datastore* odb) const {
+HashId StageArea::SaveTreeImpl(const Directory* root, Datastore* odb, bool save_empty_directories) const {
     TreeBuilder builder;
 
     root->ForEach([&](const std::string& name, const Directory::Entry& e) {
         PathEntry entry;
 
         if (e.directory) {
-            entry.id = SaveTreeImpl(e.directory.get(), odb);
+            entry.id = SaveTreeImpl(e.directory.get(), odb, save_empty_directories);
             entry.type = PathType::Directory;
+
+            if (!save_empty_directories && !entry.id) {
+                return;
+            }
         } else if (IsDirectory(e.type) && !e.id) {
             assert(e.action == Directory::Action::Add);
+
+            if (!save_empty_directories) {
+                return;
+            }
 
             entry.id = odb->Put(DataType::Tree, TreeBuilder().Serialize());
             entry.type = PathType::Directory;
@@ -377,6 +387,10 @@ HashId StageArea::SaveTreeImpl(const Directory* root, Datastore* odb) const {
 
         builder.Append(name, std::move(entry));
     });
+
+    if (builder.Empty() && !save_empty_directories) {
+        return HashId();
+    }
 
     return odb->Put(DataType::Tree, builder.Serialize());
 }
