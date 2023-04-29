@@ -1,5 +1,7 @@
 #pragma once
 
+#include "change.h"
+
 #include <vcs/object/object.h>
 #include <vcs/object/path.h>
 
@@ -9,30 +11,6 @@
 namespace Vcs {
 
 class Datastore;
-
-struct Modifications {
-    /// Attributes of an entry were changed.
-    bool attributes = false;
-    /// Content of an entry was changed.
-    bool content = false;
-    /// Type of an entry was changed.
-    bool type = false;
-
-    explicit constexpr operator bool() const noexcept {
-        return attributes || content || type;
-    }
-};
-
-struct Change {
-    /// Performed actions.
-    PathAction action = PathAction::None;
-    /// Modification flags.
-    Modifications flags;
-    /// Type of resultant entry.
-    PathType type = PathType::Unknown;
-    /// Path of changed entry.
-    std::string path;
-};
 
 class ChangelistBuilder {
 public:

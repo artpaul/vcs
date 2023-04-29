@@ -148,6 +148,16 @@ bool StageArea::Add(const std::string_view path, const PathEntry& entry) {
     return AddImpl(path, entry, MutableRoot());
 }
 
+bool StageArea::Copy(const std::string& src, const std::string& dst) {
+    if (const auto& entry = GetPathEntry(tree_id_, SplitPath(src))) {
+        if (AddImpl(dst, *entry, MutableRoot())) {
+            copies_[dst] = CommitPath{.id = HashId(), .path = std::string(src)};
+            return true;
+        }
+    }
+    return false;
+}
+
 std::optional<PathEntry> StageArea::GetEntry(const std::string_view path, bool removed) const {
     const auto& parts = SplitPath(path);
 
@@ -257,7 +267,11 @@ bool StageArea::Remove(const std::string_view path) {
 
     for (size_t i = 0, end = parts.size(); i < end; ++i) {
         if (i + 1 == end) {
-            return cur->Remove(parts[i]);
+            if (cur->Remove(parts[i])) {
+                copies_.erase(std::string(path));
+                return true;
+            }
+            return false;
         }
         if (const auto e = cur->Find(parts[i])) {
             if (e->directory) {
@@ -284,6 +298,10 @@ HashId StageArea::SaveTree(Datastore* odb, bool save_empty_directories) const {
     } else {
         return odb->Put(DataType::Tree, TreeBuilder().Serialize());
     }
+}
+
+const std::map<std::string, CommitPath>& StageArea::CopyInfo() const {
+    return copies_;
 }
 
 bool StageArea::AddImpl(const std::string_view path, const PathEntry& entry, Directory* root) {

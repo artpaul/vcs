@@ -41,6 +41,31 @@ TEST(StageArea, Add) {
     EXPECT_EQ(index.ListTree("lib").size(), 2u);
 }
 
+TEST(StageArea, Copy) {
+    Store::MemoryCache mem;
+    StageArea index(&mem, MakeLibTree(&mem));
+
+    ASSERT_TRUE(index.Copy("lib/test.h", "util/test.h"));
+    ASSERT_TRUE(index.GetEntry("util"));
+    ASSERT_TRUE(index.GetEntry("util/test.h"));
+
+    EXPECT_EQ(index.GetEntry("lib/test.h")->id, index.GetEntry("util/test.h")->id);
+
+    // Insert new entry.
+    ASSERT_TRUE(index.Add("lib/data", MakeBlob("x0x0x0x0x", &mem)));
+    // Source entry should be taken from the base tree.
+    EXPECT_FALSE(index.Copy("lib/data", "util/data"));
+
+    // Update an entry.
+    ASSERT_TRUE(index.Add("lib/test.h", MakeBlob("#pragma once;\nint test();", &mem)));
+    // Copy the entry.
+    ASSERT_TRUE(index.Copy("lib/test.h", "test"));
+    // Source entry should be taken from the base tree.
+    EXPECT_NE(index.GetEntry("lib/test.h")->id, index.GetEntry("test")->id);
+    // Copy will overwrite the current entry.
+    EXPECT_NE(index.GetEntry("test")->id, MakeBlob("", &mem).id);
+}
+
 TEST(StageArea, GetRoot) {
     Store::MemoryCache mem;
 
@@ -78,6 +103,18 @@ TEST(StageArea, ListTree) {
     EXPECT_EQ(index.ListTree("lib").size(), 2u);
     // Entries should be loaded for the base tree.
     EXPECT_EQ(index.ListTree("lib/lib").size(), 1u);
+}
+
+TEST(StageIndexCase, Move) {
+    Store::MemoryCache mem;
+    StageArea index(&mem, MakeLibTree(&mem));
+
+    ASSERT_TRUE(index.Copy("lib/test.h", "util/test.h"));
+    ASSERT_TRUE(index.Remove("lib/test.h"));
+
+    EXPECT_TRUE(index.GetEntry("util"));
+    EXPECT_TRUE(index.GetEntry("util/test.h"));
+    EXPECT_FALSE(index.GetEntry("lib/test.h"));
 }
 
 TEST(StageArea, Remove) {

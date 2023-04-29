@@ -1,8 +1,11 @@
 #pragma once
 
+#include "change.h"
+
 #include <vcs/object/hashid.h>
 #include <vcs/object/path.h>
 
+#include <map>
 #include <optional>
 #include <vector>
 
@@ -25,6 +28,11 @@ public:
      * otherwise it will be updated.
      */
     bool Add(const std::string_view path, const PathEntry& entry);
+
+    /**
+     * Copies a path within the current tree.
+     */
+    bool Copy(const std::string& src, const std::string& dst);
 
     /**
      * Returns value of the entry.
@@ -55,6 +63,16 @@ public:
      */
     HashId SaveTree(Datastore* odb, bool save_empty_directories = true) const;
 
+public:
+    /**
+     * @name Renames
+     * @{
+     */
+
+    const std::map<std::string, CommitPath>& CopyInfo() const;
+
+    /**@}*/
+
 private:
     bool AddImpl(const std::string_view path, const PathEntry& entry, Directory* root);
 
@@ -74,6 +92,8 @@ private:
     HashId tree_id_;
     /// Root of the stage tree.
     std::unique_ptr<Directory> stage_root_;
+    /// List of destinations with the source info.
+    std::map<std::string, CommitPath> copies_;
 };
 
 /**
