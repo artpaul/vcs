@@ -41,7 +41,9 @@ target_link_libraries(libvcs3 PUBLIC
     contrib-flatbuffers
     contrib-fmt
     contrib-libgit2
+    contrib-lz4
     contrib-sha
+    contrib-xxhash
     vcs-util
 )
 
@@ -56,6 +58,7 @@ target_sources(libvcs3 PRIVATE
     "object/object.cpp"
     "object/serialize.cpp"
     "object/store.cpp"
+    "store/loose.cpp"
     "store/memory.cpp"
 )
 

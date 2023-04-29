@@ -8,6 +8,14 @@
 namespace Vcs {
 
 /**
+ * Types of compression algorithms.
+ */
+enum class Compression : uint8_t {
+    None = 0,
+    Lz4 = 1,
+};
+
+/**
  * Types of data objects.
  */
 enum class DataType : uint8_t {
@@ -108,6 +116,10 @@ public:
                 result |= uint64_t(size[0]);
         }
         return result;
+    }
+
+    constexpr operator bool() const noexcept {
+        return DataType(tag & 0x0F) != DataType::None;
     }
 
 private:

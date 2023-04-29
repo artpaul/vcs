@@ -34,7 +34,7 @@ DataHeader Datastore::GetMeta(const HashId& id, bool resolve) const {
     const auto meta = DoGetMeta(id);
 
     if (resolve && meta.Type() == DataType::Index) {
-         return static_cast<DataHeader>(LoadIndex(id));
+        return static_cast<DataHeader>(LoadIndex(id));
     } else {
         return meta;
     }
