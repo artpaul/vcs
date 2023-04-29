@@ -6,11 +6,11 @@
 #include <mutex>
 #include <unordered_map>
 
-namespace Vcs {
+namespace Vcs::Store {
 
-class MemoryStore : public Datastore {
+class MemoryCache : public Datastore {
 public:
-    explicit MemoryStore(size_t capacity = 64u << 20, size_t chunk_size = 4u << 20);
+    explicit MemoryCache(size_t capacity = 64u << 20, size_t chunk_size = 4u << 20);
 
     size_t Size() const noexcept;
 
@@ -36,4 +36,4 @@ private:
     std::unordered_map<HashId, UsageList::iterator> objects_;
 };
 
-} // namespace Vcs
+} // namespace Vcs::Store

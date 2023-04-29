@@ -25,7 +25,7 @@ static HashId MakeLibTree(Datastore* odb) {
 }
 
 TEST(StageArea, Add) {
-    MemoryStore mem;
+    Store::MemoryCache mem;
     StageArea index(&mem);
 
     // Updating of root entry is prohibited.
@@ -42,7 +42,7 @@ TEST(StageArea, Add) {
 }
 
 TEST(StageArea, GetRoot) {
-    MemoryStore mem;
+    Store::MemoryCache mem;
 
     // The root entry always exists.
     EXPECT_TRUE(StageArea(&mem).GetEntry(""));
@@ -54,7 +54,7 @@ TEST(StageArea, GetRoot) {
 }
 
 TEST(StageArea, GetEntry) {
-    MemoryStore mem;
+    Store::MemoryCache mem;
     StageArea index(&mem, MakeLibTree(&mem));
 
     // Make the index mutable.
@@ -67,7 +67,7 @@ TEST(StageArea, GetEntry) {
 }
 
 TEST(StageArea, ListTree) {
-    MemoryStore mem;
+    Store::MemoryCache mem;
     StageArea index(&mem, MakeLibTree(&mem));
 
     EXPECT_EQ(index.ListTree("").size(), 2u);
@@ -81,7 +81,7 @@ TEST(StageArea, ListTree) {
 }
 
 TEST(StageArea, Remove) {
-    MemoryStore mem;
+    Store::MemoryCache mem;
     StageArea index(&mem);
 
     // Removing of root entry is prohibited.
@@ -98,7 +98,7 @@ TEST(StageArea, Remove) {
 }
 
 TEST(StageArea, RestoreRemoved) {
-    MemoryStore mem;
+    Store::MemoryCache mem;
     StageArea index(&mem, MakeLibTree(&mem));
 
     ASSERT_TRUE(index.Remove("lib"));
@@ -119,7 +119,7 @@ TEST(StageArea, RestoreRemoved) {
 }
 
 TEST(StageArea, SaveTree) {
-    MemoryStore mem;
+    Store::MemoryCache mem;
     StageArea index(&mem);
 
     ASSERT_TRUE(index.Add("lib/lib/empty", MakeBlob("", &mem)));
@@ -130,7 +130,7 @@ TEST(StageArea, SaveTree) {
 }
 
 TEST(StageArea, SaveTreeEmpty) {
-    MemoryStore mem;
+    Store::MemoryCache mem;
     StageArea index(&mem);
 
     // Root tree is always valid.
@@ -146,7 +146,7 @@ TEST(StageArea, SaveTreeEmpty) {
 }
 
 TEST(StageArea, SaveTreeUpdate) {
-    MemoryStore mem;
+    Store::MemoryCache mem;
     HashId tree_id;
 
     {
@@ -171,7 +171,7 @@ TEST(StageArea, SaveTreeUpdate) {
 }
 
 TEST(StageArea, SaveTreeChunked) {
-    MemoryStore mem(1 << 20, 1024);
+    Store::MemoryCache mem(1 << 20, 1024);
     StageArea index(&mem);
     const auto blob = MakeBlob("int test();", &mem);
 

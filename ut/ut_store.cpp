@@ -9,7 +9,7 @@ using namespace Vcs;
 
 static constexpr std::string_view text("one line of text");
 
-TEST(MemoryStore, Capacity) {
+TEST(MemoryCache, Capacity) {
     std::vector<std::pair<HashId, std::string>> blobs;
     // Make blobs.
     {
@@ -25,7 +25,7 @@ TEST(MemoryStore, Capacity) {
     }
 
     {
-        MemoryStore mem(1024);
+        Store::MemoryCache mem(1024);
         // Put an object.
         mem.Put(DataType::Blob, blobs[0].second);
         // Check that the object exists in the storage.
@@ -39,7 +39,7 @@ TEST(MemoryStore, Capacity) {
     }
 
     {
-        MemoryStore mem(1024);
+        Store::MemoryCache mem(1024);
         // Put and object.
         mem.Put(DataType::Blob, blobs[0].second);
         // Check that the object exists in the storage.
@@ -59,7 +59,7 @@ TEST(MemoryStore, Capacity) {
     }
 }
 
-TEST(MemoryStore, BlobChunked) {
+TEST(MemoryCache, BlobChunked) {
     std::string content(text);
     // Make a big string.
     for (size_t i = 0, end = 10; i < end; ++i) {
@@ -71,7 +71,7 @@ TEST(MemoryStore, BlobChunked) {
     ASSERT_EQ(content.size(), 8703u);
 
     {
-        MemoryStore mem(4 << 20, 1 << 20);
+        Store::MemoryCache mem(4 << 20, 1 << 20);
         const auto id = mem.Put(DataType::Blob, content);
 
         ASSERT_TRUE(mem.IsExists(id));
@@ -80,7 +80,7 @@ TEST(MemoryStore, BlobChunked) {
     }
 
     {
-        MemoryStore mem(1 << 20, 512);
+        Store::MemoryCache mem(1 << 20, 512);
         const auto id = mem.Put(DataType::Blob, content);
 
         ASSERT_TRUE(mem.IsExists(id));
@@ -91,7 +91,7 @@ TEST(MemoryStore, BlobChunked) {
     }
 }
 
-TEST(MemoryStore, TreeChunked) {
+TEST(MemoryCache, TreeChunked) {
     TreeBuilder builder;
 
     for (size_t i = 0; i < 100; ++i) {
@@ -101,7 +101,7 @@ TEST(MemoryStore, TreeChunked) {
         );
     }
 
-    MemoryStore mem(1 << 20, 512);
+    Store::MemoryCache mem(1 << 20, 512);
     const auto id = mem.Put(DataType::Tree, builder.Serialize());
 
     ASSERT_TRUE(mem.IsExists(id));

@@ -1,18 +1,18 @@
 #include "memory.h"
 
-namespace Vcs {
+namespace Vcs::Store {
 
-MemoryStore::MemoryStore(size_t capacity, size_t chunk_size)
+MemoryCache::MemoryCache(size_t capacity, size_t chunk_size)
     : Datastore(chunk_size)
     , capacity_(capacity)
     , size_(0) {
 }
 
-size_t MemoryStore::Size() const noexcept {
+size_t MemoryCache::Size() const noexcept {
     return size_;
 }
 
-DataHeader MemoryStore::DoGetMeta(const HashId& id) const {
+DataHeader MemoryCache::DoGetMeta(const HashId& id) const {
     std::lock_guard g(mutex_);
 
     if (auto oi = objects_.find(id); oi != objects_.end()) {
@@ -24,13 +24,13 @@ DataHeader MemoryStore::DoGetMeta(const HashId& id) const {
     }
 }
 
-bool MemoryStore::DoIsExists(const HashId& id) const {
+bool MemoryCache::DoIsExists(const HashId& id) const {
     std::lock_guard g(mutex_);
 
     return objects_.find(id) != objects_.end();
 }
 
-Object MemoryStore::DoLoad(const HashId& id, const DataType) const {
+Object MemoryCache::DoLoad(const HashId& id, const DataType) const {
     std::lock_guard g(mutex_);
 
     if (auto oi = objects_.find(id); oi != objects_.end()) {
@@ -41,11 +41,11 @@ Object MemoryStore::DoLoad(const HashId& id, const DataType) const {
     }
 }
 
-HashId MemoryStore::DoPut(DataType type, std::string_view content) {
+HashId MemoryCache::DoPut(DataType type, std::string_view content) {
     return InsertObject(HashId::Make(type, content), Object::Load(type, content));
 }
 
-HashId MemoryStore::InsertObject(const HashId& id, Object obj) {
+HashId MemoryCache::InsertObject(const HashId& id, Object obj) {
     UsageList removed;
 
     {
@@ -69,4 +69,4 @@ HashId MemoryStore::InsertObject(const HashId& id, Object obj) {
     return id;
 }
 
-} // namespace Vcs
+} // namespace Vcs::Store
