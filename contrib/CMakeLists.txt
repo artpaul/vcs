@@ -1,3 +1,4 @@
+add_subdirectory(acto)
 add_subdirectory(cxxopts)
 add_subdirectory(flatbuffers)
 add_subdirectory(fmt)
