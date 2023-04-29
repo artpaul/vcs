@@ -12,15 +12,21 @@
 namespace Vcs::Git {
 
 class Converter {
+public:
     struct Options {
-        /// Cache oids of converted blobs.
-        bool use_blob_chache = true;
+        /// Detect and store renames.
+        bool detect_renames = true;
         /// Store hash of original commit in converted object.
         bool store_original_hash = true;
+        /// Cache oids of converted blobs.
+        bool use_blob_chache = false;
     };
 
 public:
-    explicit Converter(const std::filesystem::path& path);
+    /**
+     * @param path path to bare git repository.
+     */
+    Converter(const std::filesystem::path& path, const Options& options);
 
     ~Converter();
 
