@@ -1,5 +1,4 @@
 #include "commit.h"
-
 #include "serialize.h"
 #include "store.h"
 

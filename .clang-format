@@ -75,15 +75,33 @@ ForEachMacros:
   - foreach
   - Q_FOREACH
   - BOOST_FOREACH
+IncludeBlocks: Regroup
 IncludeCategories:
   - Regex:           '^".*\.h"'
     Priority:        0
     CaseSensitive:   false
-    SortPriority:    1
+    SortPriority:    2
+
+  - Regex:           '^<(ut|vcs)/.*\.h>'
+    Priority:        2
+    CaseSensitive:   false
+
+  - Regex:           '^<(util)/.*\.h>'
+    Priority:        3
+    CaseSensitive:   false
+
+  - Regex:           '^<(contrib)/.*\.(h|hpp)>'
+    Priority:        4
+    CaseSensitive:   false
+
+  - Regex:           '^<.*'
+    Priority:        9
+    CaseSensitive:   false
+
   - Regex:           '.*'
     Priority:        10
     CaseSensitive:   false
-IncludeIsMainRegex: '([-_](test|unittest))?$'
+IncludeIsMainRegex: '([-_](test|unittest|ut))?$'
 IncludeIsMainSourceRegex: ''
 IndentAccessModifiers: false
 IndentCaseBlocks: false

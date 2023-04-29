@@ -1,6 +1,6 @@
 #include "loose.h"
 
-#include <vcs/util/file.h>
+#include <util/file.h>
 
 #include <contrib/lz4/lz4.h>
 #include <contrib/xxhash/xxhash.h>

@@ -59,6 +59,7 @@ public:
         return data_;
     }
 
+    /** Byte size of the data. */
     constexpr size_t Size() const noexcept {
         return sizeof(data_);
     }

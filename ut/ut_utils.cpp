@@ -1,5 +1,5 @@
-#include <vcs/util/arena.h>
-#include <vcs/util/split.h>
+#include <util/arena.h>
+#include <util/split.h>
 
 #include <contrib/gtest/gtest.h>
 

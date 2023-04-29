@@ -3,7 +3,8 @@
 #include <vcs/object/object.h>
 #include <vcs/object/serialize.h>
 #include <vcs/object/store.h>
-#include <vcs/util/split.h>
+
+#include <util/split.h>
 
 #include <map>
 #include <memory>
