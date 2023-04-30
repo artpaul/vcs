@@ -26,24 +26,99 @@ Object ConstructObjectFromIndex(const Index& index, const Datastore* odb) {
 
 } // namespace
 
-Datastore::Datastore(const size_t chunk_size) noexcept
-    : chunk_size_(chunk_size) {
+class Datastore::Impl {
+public:
+    constexpr Impl() noexcept
+        : cache_(false) {
+    }
+
+    Impl(std::shared_ptr<Impl> other, std::shared_ptr<Backend> backend, bool cache) noexcept
+        : backend_(std::move(backend))
+        , upsteram_(std::move(other))
+        , cache_(cache) {
+        assert(backend_);
+        assert(upsteram_);
+    }
+
+    DataHeader GetMeta(const HashId& id) const {
+        if (backend_) {
+            if (auto meta = backend_->GetMeta(id)) {
+                return meta;
+            }
+        }
+        if (upsteram_) {
+            if (auto meta = upsteram_->GetMeta(id)) {
+                return meta;
+            }
+        }
+        return DataHeader();
+    }
+
+    bool Exists(const HashId& id) const {
+        if (backend_) {
+            if (backend_->Exists(id)) {
+                return true;
+            }
+        }
+        if (upsteram_) {
+            if (upsteram_->Exists(id)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    Object Load(const HashId& id, const DataType expected) const {
+        if (backend_) {
+            if (auto obj = backend_->Load(id, expected)) {
+                return obj;
+            }
+        }
+        if (upsteram_) {
+            if (auto obj = upsteram_->Load(id, expected)) {
+                if (backend_ && cache_) {
+                    backend_->Put(id, obj);
+                }
+                return obj;
+            }
+        }
+        return Object();
+    }
+
+    void Put(const HashId& id, const DataType type, const std::string_view content) {
+        if (backend_) {
+            backend_->Put(id, type, content);
+        }
+        if (upsteram_) {
+            upsteram_->Put(id, type, content);
+        }
+    }
+
+private:
+    std::shared_ptr<Backend> backend_;
+    std::shared_ptr<Impl> upsteram_;
+    /// Put objects received from upstream into local backend.
+    bool cache_;
+};
+
+Datastore::Datastore(const size_t chunk_size)
+    : chunk_size_(chunk_size)
+    , impl_(std::make_shared<Impl>()) {
 }
 
 Datastore::Datastore(const Datastore& other, std::shared_ptr<Backend> backend, bool cache)
     : chunk_size_(other.chunk_size_)
-    , backends_(other.backends_) {
-    backends_.emplace_back(std::move(backend), cache);
+    , impl_(std::make_shared<Impl>(other.impl_, std::move(backend), cache)) {
 }
 
+Datastore::~Datastore() = default;
+
 DataHeader Datastore::GetMeta(const HashId& id, bool resolve) const {
-    for (auto ri = backends_.rbegin(); ri != backends_.rend(); ++ri) {
-        if (auto meta = ri->first->GetMeta(id)) {
-            if (resolve && meta.Type() == DataType::Index) {
-                return static_cast<DataHeader>(LoadIndex(id));
-            } else {
-                return meta;
-            }
+    if (auto meta = impl_->GetMeta(id)) {
+        if (resolve && meta.Type() == DataType::Index) {
+            return static_cast<DataHeader>(LoadIndex(id));
+        } else {
+            return meta;
         }
     }
     return DataHeader();
@@ -54,12 +129,7 @@ DataType Datastore::GetType(const HashId& id, bool resolve) const {
 }
 
 bool Datastore::IsExists(const HashId& id) const {
-    for (auto ri = backends_.rbegin(); ri != backends_.rend(); ++ri) {
-        if (ri->first->Exists(id)) {
-            return true;
-        }
-    }
-    return false;
+    return impl_->Exists(id);
 }
 
 Object Datastore::Load(const HashId& id) const {
@@ -67,23 +137,7 @@ Object Datastore::Load(const HashId& id) const {
 }
 
 Object Datastore::Load(const HashId& id, DataType expected) const {
-    bool cache = false;
-    for (auto ri = backends_.rbegin(); ri != backends_.rend(); ++ri) {
-        cache |= ri->second;
-        if (auto obj = ri->first->Load(id, expected)) {
-            // Put object in cache if needed.
-            if (cache) {
-                for (auto ci = backends_.rbegin(); ci != ri; ++ci) {
-                    if (ci->second) {
-                        ci->first->Put(id, obj);
-                    }
-                }
-            }
-            // Return object.
-            return obj;
-        }
-    }
-    return Object();
+    return impl_->Load(id, expected);
 }
 
 Blob Datastore::LoadBlob(const HashId& id) const {
@@ -134,9 +188,7 @@ HashId Datastore::Put(const DataType type, const std::string_view content) {
     const auto put_single_object = [this](HashId id, const DataType type, const std::string_view content) {
         id = bool(id) ? id : HashId::Make(type, content);
 
-        for (auto ri = backends_.rbegin(); ri != backends_.rend(); ++ri) {
-            ri->first->Put(id, type, content);
-        }
+        impl_->Put(id, type, content);
 
         return id;
     };

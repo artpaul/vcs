@@ -2,7 +2,6 @@
 
 #include <vcs/object/object.h>
 #include <vcs/object/serialize.h>
-#include <vcs/object/store.h>
 
 #include <util/split.h>
 
@@ -136,11 +135,11 @@ bool StageArea::Directory::Upsert(const std::string_view name, const PathEntry& 
     return true;
 }
 
-StageArea::StageArea(const Datastore* odb, const HashId& tree_id) noexcept
+StageArea::StageArea(const Datastore& odb, const HashId& tree_id) noexcept
     : odb_(odb)
     , tree_id_(tree_id) {
     // Check that tree_id points to Tree object.
-    assert(!tree_id_ || odb_->GetType(tree_id_, true) == DataType::Tree);
+    assert(!tree_id_ || odb_.GetType(tree_id_, true) == DataType::Tree);
 }
 
 StageArea::~StageArea() = default;
@@ -214,7 +213,7 @@ std::vector<std::pair<std::string, PathEntry>> StageArea::ListTree(
 
         if (const auto& ei = GetPathEntry(tree_id, parts)) {
             if (ei->type == PathType::Directory) {
-                const auto tree = odb_->LoadTree(ei->id);
+                const auto tree = odb_.LoadTree(ei->id);
 
                 for (const auto& e : tree.Entries()) {
                     entries.emplace_back(
@@ -278,7 +277,7 @@ bool StageArea::Remove(const std::string_view path) {
             if (e->directory) {
                 cur = e->directory.get();
             } else if (IsDirectory(e->type)) {
-                e->directory = Directory::FromTree(odb_->LoadTree(e->id));
+                e->directory = Directory::FromTree(odb_.LoadTree(e->id));
                 cur = e->directory.get();
             } else {
                 break;
@@ -291,13 +290,14 @@ bool StageArea::Remove(const std::string_view path) {
     return false;
 }
 
-HashId StageArea::SaveTree(Datastore* odb, bool save_empty_directories) const {
-    const auto id = stage_root_ ? SaveTreeImpl(stage_root_.get(), odb, save_empty_directories) : tree_id_;
+HashId StageArea::SaveTree(Datastore odb, bool save_empty_directories) const {
+    const auto id =
+        stage_root_ ? SaveTreeImpl(stage_root_.get(), std::move(odb), save_empty_directories) : tree_id_;
     // Ensure return value is always points to existed tree object.
     if (id) {
         return id;
     } else {
-        return odb->Put(DataType::Tree, TreeBuilder().Serialize());
+        return odb.Put(DataType::Tree, TreeBuilder().Serialize());
     }
 }
 
@@ -318,7 +318,7 @@ bool StageArea::AddImpl(const std::string_view path, const PathEntry& entry, Dir
             } else if (e->type == PathType::Directory) {
                 // It's a directory node. Load it.
                 if (e->id) {
-                    e->directory = Directory::FromTree(odb_->LoadTree(e->id));
+                    e->directory = Directory::FromTree(odb_.LoadTree(e->id));
                 } else {
                     e->directory = Directory::MakeEmpty();
                 }
@@ -346,14 +346,14 @@ std::optional<PathEntry> StageArea::GetPathEntry(
         return PathEntry{.id = id, .type = PathType::Directory};
     }
 
-    Tree tree = odb_->LoadTree(id);
+    Tree tree = odb_.LoadTree(id);
 
     for (size_t i = 0; i < parts.size(); ++i) {
         if (const auto& e = tree.Find(parts[i])) {
             if (i + 1 == parts.size()) {
                 return PathEntry{.id = e->Id(), .type = e->Type(), .size = e->Size()};
             } else if (IsDirectory(e->Type())) {
-                tree = odb_->LoadTree(e->Id());
+                tree = odb_.LoadTree(e->Id());
             } else {
                 break;
             }
@@ -370,13 +370,13 @@ StageArea::Directory* StageArea::MutableRoot() {
         return stage_root_.get();
     }
     if (tree_id_) {
-        return (stage_root_ = Directory::FromTree(odb_->LoadTree(tree_id_))).get();
+        return (stage_root_ = Directory::FromTree(odb_.LoadTree(tree_id_))).get();
     } else {
         return (stage_root_ = Directory::MakeEmpty()).get();
     }
 }
 
-HashId StageArea::SaveTreeImpl(const Directory* root, Datastore* odb, bool save_empty_directories) const {
+HashId StageArea::SaveTreeImpl(const Directory* root, Datastore odb, bool save_empty_directories) const {
     TreeBuilder builder;
 
     root->ForEach([&](const std::string& name, const Directory::Entry& e) {
@@ -396,7 +396,7 @@ HashId StageArea::SaveTreeImpl(const Directory* root, Datastore* odb, bool save_
                 return;
             }
 
-            entry.id = odb->Put(DataType::Tree, TreeBuilder().Serialize());
+            entry.id = odb.Put(DataType::Tree, TreeBuilder().Serialize());
             entry.type = PathType::Directory;
         } else {
             entry.id = e.id;
@@ -411,14 +411,14 @@ HashId StageArea::SaveTreeImpl(const Directory* root, Datastore* odb, bool save_
         return HashId();
     }
 
-    return odb->Put(DataType::Tree, builder.Serialize());
+    return odb.Put(DataType::Tree, builder.Serialize());
 }
 
-HashId GetTreeId(const HashId& id, const Datastore* odb) {
-    if (odb->GetType(id, true) == DataType::Tree) {
+HashId GetTreeId(const HashId& id, const Datastore& odb) {
+    if (odb.GetType(id, true) == DataType::Tree) {
         return id;
     } else {
-        return odb->LoadCommit(id).Tree();
+        return odb.LoadCommit(id).Tree();
     }
 }
 

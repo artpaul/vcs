@@ -6,15 +6,15 @@
 
 using namespace Vcs;
 
-static PathEntry MakeBlob(const std::string_view content, Datastore* odb) {
+static PathEntry MakeBlob(const std::string_view content, Datastore odb) {
     return PathEntry{
-        .id = odb->Put(DataType::Blob, content),
+        .id = odb.Put(DataType::Blob, content),
         .type = PathType::File,
         .size = content.size(),
     };
 }
 
-static HashId MakeTreeLib(Datastore* odb) {
+static HashId MakeTreeLib(Datastore odb) {
     StageArea index(odb);
 
     index.Add("bin/main.cpp", MakeBlob("extern main;", odb));
@@ -23,7 +23,7 @@ static HashId MakeTreeLib(Datastore* odb) {
     return index.SaveTree(odb);
 }
 
-static HashId MakeTreeUtil(Datastore* odb) {
+static HashId MakeTreeUtil(Datastore odb) {
     StageArea index(odb);
 
     index.Add("lib/test.h", MakeBlob("int test( return 0; );", odb));
@@ -35,11 +35,11 @@ static HashId MakeTreeUtil(Datastore* odb) {
 TEST(ChangelistBuilderTest, Changes) {
     auto mem = Datastore::Make<Store::MemoryCache>();
 
-    HashId tree_lib = MakeTreeLib(&mem);
-    HashId tree_util = MakeTreeUtil(&mem);
+    HashId tree_lib = MakeTreeLib(mem);
+    HashId tree_util = MakeTreeUtil(mem);
 
     std::vector<Change> changes;
-    ChangelistBuilder(&mem, changes).Changes(tree_lib, tree_util);
+    ChangelistBuilder(mem, changes).Changes(tree_lib, tree_util);
 
     ASSERT_EQ(changes.size(), 5u);
 
@@ -63,11 +63,11 @@ TEST(ChangelistBuilderTest, Changes) {
 TEST(ChangelistBuilderTest, ChangesNoDirectoryExpansion) {
     auto mem = Datastore::Make<Store::MemoryCache>();
 
-    HashId tree_lib = MakeTreeLib(&mem);
-    HashId tree_util = MakeTreeUtil(&mem);
+    HashId tree_lib = MakeTreeLib(mem);
+    HashId tree_util = MakeTreeUtil(mem);
 
     std::vector<Change> changes;
-    ChangelistBuilder(&mem, changes).SetExpandDirectories(false).Changes(tree_lib, tree_util);
+    ChangelistBuilder(mem, changes).SetExpandDirectories(false).Changes(tree_lib, tree_util);
 
     ASSERT_EQ(changes.size(), 3u);
 

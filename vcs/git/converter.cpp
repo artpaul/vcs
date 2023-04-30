@@ -5,6 +5,7 @@
 #include <vcs/object/commit.h>
 #include <vcs/object/serialize.h>
 #include <vcs/object/store.h>
+#include <vcs/store/memory.h>
 
 #include <contrib/fmt/fmt/format.h>
 #include <contrib/libgit2/include/git2.h>
@@ -22,7 +23,7 @@ void CheckError(int error_code, const char* action) {
 
 class Builder {
 public:
-    Builder(Datastore* odb, StageArea* stage, git_repository* repo)
+    Builder(Datastore& odb, StageArea& stage, git_repository* repo)
         : odb_(odb)
         , stage_(stage)
         , repo_(repo) {
@@ -55,41 +56,41 @@ private:
 
         switch (delta->status) {
             case GIT_DELTA_ADDED:
-                if (!stage_->Add(delta->new_file.path, MakeBlob(delta->new_file))) {
+                if (!stage_.Add(delta->new_file.path, MakeBlob(delta->new_file))) {
                     throw std::runtime_error(fmt::format("cannot add path {}", delta->new_file.path));
                 }
                 break;
             case GIT_DELTA_DELETED:
-                if (!stage_->Remove(delta->old_file.path)) {
+                if (!stage_.Remove(delta->old_file.path)) {
                     throw std::runtime_error(fmt::format("cannot delete path {}", delta->old_file.path));
                 }
                 break;
             case GIT_DELTA_MODIFIED:
-                if (!stage_->Add(delta->new_file.path, MakeBlob(delta->new_file))) {
+                if (!stage_.Add(delta->new_file.path, MakeBlob(delta->new_file))) {
                     throw std::runtime_error(fmt::format("cannot update path {}", delta->new_file.path));
                 }
                 break;
             case GIT_DELTA_RENAMED:
                 // Setup copy-info.
-                if (!stage_->Copy(delta->old_file.path, delta->new_file.path)) {
+                if (!stage_.Copy(delta->old_file.path, delta->new_file.path)) {
                     throw std::runtime_error(fmt::format("cannot copy path {}", delta->new_file.path));
                 }
                 // Update destination entry,
-                if (!stage_->Add(delta->new_file.path, MakeBlob(delta->new_file))) {
+                if (!stage_.Add(delta->new_file.path, MakeBlob(delta->new_file))) {
                     throw std::runtime_error(fmt::format("cannot update path {}", delta->new_file.path));
                 }
                 // Remove source entry.
-                if (!stage_->Remove(delta->old_file.path)) {
+                if (!stage_.Remove(delta->old_file.path)) {
                     throw std::runtime_error(fmt::format("cannot delete path {}", delta->old_file.path));
                 }
                 break;
             case GIT_DELTA_COPIED:
                 // Setup copy-info.
-                if (!stage_->Copy(delta->old_file.path, delta->new_file.path)) {
+                if (!stage_.Copy(delta->old_file.path, delta->new_file.path)) {
                     throw std::runtime_error(fmt::format("cannot copy path {}", delta->new_file.path));
                 }
                 // Update destination entry,
-                if (!stage_->Add(delta->new_file.path, MakeBlob(delta->new_file))) {
+                if (!stage_.Add(delta->new_file.path, MakeBlob(delta->new_file))) {
                     throw std::runtime_error(fmt::format("cannot update path {}", delta->new_file.path));
                 }
                 break;
@@ -122,7 +123,7 @@ private:
 
         // Save blob content.
         entry.size = git_blob_rawsize(blob.get());
-        entry.id = odb_->Put(
+        entry.id = odb_.Put(
             DataType::Blob,
             std::string_view(
                 reinterpret_cast<const char*>(git_blob_rawcontent(blob.get())), git_blob_rawsize(blob.get())
@@ -153,8 +154,8 @@ private:
     }
 
 private:
-    Datastore* const odb_;
-    StageArea* const stage_;
+    Datastore& odb_;
+    StageArea& stage_;
     git_repository* const repo_;
     std::unique_ptr<std::unordered_map<HashId, std::pair<HashId, uint32_t>>> blob_cache_;
 };
@@ -169,7 +170,7 @@ public:
 
     void SetRemap(std::function<HashId(const HashId&)> remap);
 
-    HashId ConvertCommit(const HashId& id, Datastore* odb);
+    HashId ConvertCommit(const HashId& id, Datastore odb);
 
     void ListCommits(const std::string& head, const std::function<WalkAction(const HashId&)>& cb) const;
 
@@ -177,6 +178,7 @@ private:
     Options options_;
     git_repository* repo_{nullptr};
     std::function<HashId(const HashId&)> remap_;
+    std::shared_ptr<Store::MemoryCache> tree_cache_;
 };
 
 Converter::Impl::Impl(const std::filesystem::path& path, const Options& options)
@@ -184,6 +186,8 @@ Converter::Impl::Impl(const std::filesystem::path& path, const Options& options)
     ::git_libgit2_init();
 
     CheckError(::git_repository_open_bare(&repo_, path.c_str()), "opening repository");
+
+    tree_cache_ = Store::MemoryCache::Make(32u << 20);
 }
 
 Converter::Impl::~Impl() {
@@ -198,7 +202,7 @@ void Converter::Impl::SetRemap(std::function<HashId(const HashId&)> remap) {
     remap_ = std::move(remap);
 }
 
-HashId Converter::Impl::ConvertCommit(const HashId& id, Datastore* odb) {
+HashId Converter::Impl::ConvertCommit(const HashId& id, Datastore odb) {
     git_oid oid;
 
     assert(remap_);
@@ -237,6 +241,7 @@ HashId Converter::Impl::ConvertCommit(const HashId& id, Datastore* odb) {
         }
     }
 
+    auto stage_odb = odb.Cache(tree_cache_);
     std::unique_ptr<StageArea> stage;
 
     {
@@ -289,17 +294,17 @@ HashId Converter::Impl::ConvertCommit(const HashId& id, Datastore* odb) {
                 CheckError(git_diff_find_similar(diff.get(), &find_opts), "detect renames");
             }
 
-            stage = std::make_unique<StageArea>(odb, GetTreeId(builder.parents[0], odb));
+            stage = std::make_unique<StageArea>(stage_odb, GetTreeId(builder.parents[0], stage_odb));
         } else {
             {
                 git_diff* r{};
                 git_diff_tree_to_tree(&r, repo_, nullptr, tree.get(), &options);
                 diff.reset(r);
             }
-            stage = std::make_unique<StageArea>(odb);
+            stage = std::make_unique<StageArea>(stage_odb);
         }
 
-        Builder(odb, stage.get(), repo_).UseBlobCache(options_.use_blob_chache).Apply(diff.get());
+        Builder(odb, *stage, repo_).UseBlobCache(options_.use_blob_chache).Apply(diff.get());
     }
 
     if (options_.store_original_hash) {
@@ -328,24 +333,24 @@ HashId Converter::Impl::ConvertCommit(const HashId& id, Datastore* odb) {
             });
         }
 
-        builder.renames = odb->Put(DataType::Renames, renames.Serialize());
+        builder.renames = odb.Put(DataType::Renames, renames.Serialize());
     }
 
     //
     builder.message = git_commit_message(wcommit.get());
-    builder.tree = stage->SaveTree(odb, false);
-    builder.generation = 1 + GetLargestGeneration(builder, odb);
+    builder.tree = stage->SaveTree(stage_odb, false);
+    builder.generation = 1 + GetLargestGeneration(builder, stage_odb);
 
     tree.reset();
     wcommit.reset();
 
     const auto& content = builder.Serialize();
     // Check consistency.
-    if (!CheckConsistency(Object::Load(DataType::Commit, content), odb)) {
+    if (!CheckConsistency(Object::Load(DataType::Commit, content), stage_odb)) {
         throw std::runtime_error("inconsistent commit object");
     }
     // Save to databaes.
-    return odb->Put(DataType::Commit, content);
+    return stage_odb.Put(DataType::Commit, content);
 }
 
 void Converter::Impl::ListCommits(
@@ -401,8 +406,8 @@ Converter& Converter::SetRemap(std::function<HashId(const HashId&)> remap) {
     return *this;
 }
 
-HashId Converter::ConvertCommit(const HashId& id, Datastore* odb) {
-    return impl_->ConvertCommit(id, odb);
+HashId Converter::ConvertCommit(const HashId& id, Datastore odb) {
+    return impl_->ConvertCommit(id, std::move(odb));
 }
 
 void Converter::ListCommits(const std::string& head, const std::function<WalkAction(const HashId&)>& cb)

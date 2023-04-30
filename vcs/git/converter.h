@@ -42,7 +42,7 @@ public:
      * @param odb object storage.
      * @return HashId
      */
-    HashId ConvertCommit(const HashId& id, Datastore* odb);
+    HashId ConvertCommit(const HashId& id, Datastore odb);
 
     /**
      * Lists commits reachable from the head in order suitable for conversion.

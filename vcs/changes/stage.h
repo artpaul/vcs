@@ -4,6 +4,7 @@
 
 #include <vcs/object/hashid.h>
 #include <vcs/object/path.h>
+#include <vcs/object/store.h>
 
 #include <map>
 #include <optional>
@@ -11,13 +12,11 @@
 
 namespace Vcs {
 
-class Datastore;
-
 class StageArea {
     class Directory;
 
 public:
-    explicit StageArea(const Datastore* odb, const HashId& tree_id = HashId()) noexcept;
+    explicit StageArea(const Datastore& odb, const HashId& tree_id = HashId()) noexcept;
 
     ~StageArea();
 
@@ -61,7 +60,7 @@ public:
      *
      * @return root hash of created tree.
      */
-    HashId SaveTree(Datastore* odb, bool save_empty_directories = true) const;
+    HashId SaveTree(Datastore odb, bool save_empty_directories = true) const;
 
 public:
     /**
@@ -84,10 +83,10 @@ private:
 
     Directory* MutableRoot();
 
-    HashId SaveTreeImpl(const Directory* root, Datastore* odb, bool save_empty_directory) const;
+    HashId SaveTreeImpl(const Directory* root, Datastore odb, bool save_empty_directory) const;
 
 private:
-    const Datastore* odb_;
+    const Datastore& odb_;
     /// Root of a base tree.
     HashId tree_id_;
     /// Root of the stage tree.
@@ -101,6 +100,6 @@ private:
  *
  * @param id  id of a commit or a tree object.
  */
-HashId GetTreeId(const HashId& id, const Datastore* odb);
+HashId GetTreeId(const HashId& id, const Datastore& odb);
 
 } // namespace Vcs

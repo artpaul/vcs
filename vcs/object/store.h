@@ -36,7 +36,9 @@ public:
     };
 
 public:
-    explicit Datastore(const size_t chunk_size = (4 << 20)) noexcept;
+    explicit Datastore(const size_t chunk_size = (4 << 20));
+
+    ~Datastore();
 
     /**
      * Chains a backend with the datastore in caching mode.
@@ -61,7 +63,7 @@ public:
     }
 
     /**
-     * Makes a datastore with default configuration and the give backend.
+     * Makes a datastore with a default configuration and the give backend.
      */
     template <typename B, typename... Args>
     static Datastore Make(Args&&... args) {
@@ -69,45 +71,95 @@ public:
     }
 
 public:
-    /// Returns metadata for an object with the given id.
+    /**
+     * @name Metadata routines.
+     * @{
+     */
+
+    /**
+     * Returns metadata for an object with the given id.
+     */
     DataHeader GetMeta(const HashId& id, bool resolve = false) const;
 
-    /// Returns type of an object with the given id.
+    /**
+     * Returns type of an object with the given id.
+     */
     DataType GetType(const HashId& id, bool resolve = false) const;
 
-    /// Checks whether an object with the id exists in the store.
+    /**
+     * Checks whether an object with the id exists in the store.
+     */
     bool IsExists(const HashId& id) const;
 
-    /// Loads object.
+    /**@}*/
+
+public:
+    /**
+     * @name Loading routines.
+     * @{
+     */
+
+    /**
+     * Loads object.
+     */
     Object Load(const HashId& id) const;
 
-    /// Loads object.
+    /**
+     * Loads object.
+     */
     Object Load(const HashId& id, DataType expected) const;
 
-    /// Loads blob object.
+    /**
+     * Loads blob object.
+     */
     Blob LoadBlob(const HashId& id) const;
 
-    /// Loads commit object.
+    /**
+     * Loads commit object.
+     */
     Commit LoadCommit(const HashId& id) const;
 
-    /// Loads index object.
+    /**
+     * Loads index object.
+     */
     Index LoadIndex(const HashId& id) const;
 
-    /// Loads renames object.
+    /**
+     * Loads renames object.
+     */
     Renames LoadRenames(const HashId& id) const;
 
-    /// Loads tree object.
+    /**
+     * Loads tree object.
+     */
     Tree LoadTree(const HashId& id) const;
 
-    /// Puts an object into the datastore.
+    /**@}*/
+
+public:
+    /**
+     * @name Saving routines.
+     * @{
+     */
+
+    /**
+     * Puts an object into the datastore.
+     */
     HashId Put(const DataType type, const std::string_view content);
+
+    /**@}*/
 
 private:
     Datastore(const Datastore& other, std::shared_ptr<Backend> backend, bool cache);
 
 private:
+    class Impl;
+
     size_t chunk_size_;
-    std::vector<std::pair<std::shared_ptr<Backend>, bool>> backends_;
+    std::shared_ptr<Impl> impl_;
 };
+
+/// Ensure Datastore is move constructible.
+static_assert(std::is_move_constructible_v<Datastore>);
 
 } // namespace Vcs

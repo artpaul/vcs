@@ -2,7 +2,6 @@
 #include "stage.h"
 
 #include <vcs/object/serialize.h>
-#include <vcs/object/store.h>
 
 namespace Vcs {
 namespace {
@@ -22,9 +21,9 @@ Modifications CompareEntries(const Tree::Entry x, const Tree::Entry y) {
     return flags;
 }
 
-Tree GetRoot(const HashId& id, const Datastore* odb) {
+Tree GetRoot(const HashId& id, const Datastore& odb) {
     if (id) {
-        return odb->LoadTree(GetTreeId(id, odb));
+        return odb.LoadTree(GetTreeId(id, odb));
     } else {
         return Tree::Load(TreeBuilder().Serialize());
     }
@@ -42,13 +41,13 @@ static std::string JoinPath(std::string path, const std::string_view name) {
 
 } // namespace
 
-ChangelistBuilder::ChangelistBuilder(const Datastore* odb, std::function<void(Change)> cb)
+ChangelistBuilder::ChangelistBuilder(const Datastore& odb, std::function<void(Change)> cb)
     : odb_(odb)
     , cb_(std::move(cb)) {
     assert(cb_);
 }
 
-ChangelistBuilder::ChangelistBuilder(const Datastore* odb, std::vector<Change>& changes)
+ChangelistBuilder::ChangelistBuilder(const Datastore& odb, std::vector<Change>& changes)
     : odb_(odb)
     , cb_([&changes](Change change) { changes.push_back(std::move(change)); }) {
 }
@@ -103,7 +102,7 @@ void ChangelistBuilder::ProcessAdded(const std::string& path, const Tree::Entry 
     EmitAdd(path, to.Type());
 
     if (IsDirectory(to.Type()) && expand_directories_) {
-        const auto& tree = odb_->LoadTree(to.Id());
+        const auto& tree = odb_.LoadTree(to.Id());
 
         for (const auto entry : tree.Entries()) {
             ProcessAdded(JoinPath(path, entry.Name()), entry);
@@ -121,7 +120,7 @@ void ChangelistBuilder::ProcessChanged(
         } else if (IsFile(from.Type())) {
             EmitChange(path, from.Type(), flags);
         } else if (IsDirectory(to.Type())) {
-            TreeChanges(path, odb_->LoadTree(from.Id()), odb_->LoadTree(to.Id()));
+            TreeChanges(path, odb_.LoadTree(from.Id()), odb_.LoadTree(to.Id()));
         } else {
             assert(false);
         }
@@ -132,7 +131,7 @@ void ChangelistBuilder::ProcessDeleted(const std::string& path, const Tree::Entr
     EmitDelete(path, from.Type());
 
     if (IsDirectory(from.Type()) && expand_directories_) {
-        const auto& tree = odb_->LoadTree(from.Id());
+        const auto& tree = odb_.LoadTree(from.Id());
 
         for (const auto entry : tree.Entries()) {
             ProcessDeleted(JoinPath(path, entry.Name()), entry);

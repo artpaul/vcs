@@ -4,6 +4,7 @@
 
 #include <vcs/object/object.h>
 #include <vcs/object/path.h>
+#include <vcs/object/store.h>
 
 #include <functional>
 #include <vector>
@@ -14,8 +15,8 @@ class Datastore;
 
 class ChangelistBuilder {
 public:
-    ChangelistBuilder(const Datastore* odb, std::function<void(Change)> cb);
-    ChangelistBuilder(const Datastore* odb, std::vector<Change>& changes);
+    ChangelistBuilder(const Datastore& odb, std::function<void(Change)> cb);
+    ChangelistBuilder(const Datastore& odb, std::vector<Change>& changes);
 
     void Changes(const HashId& from, const HashId& to);
 
@@ -40,7 +41,7 @@ private:
     void TreeChanges(const std::string& path, const Tree& from, const Tree& to);
 
 private:
-    const Datastore* odb_;
+    const Datastore& odb_;
     std::function<void(Change)> cb_;
     /// Expand content created or deleted directories.
     bool expand_directories_ = true;
