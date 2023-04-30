@@ -3,11 +3,13 @@
 #include <vcs/object/store.h>
 
 #include <list>
-#include <mutex>
 #include <unordered_map>
 
 namespace Vcs::Store {
 
+/**
+ * @note The cache is not thread-safe.
+ */
 class MemoryCache : public Datastore::Backend {
 public:
     explicit MemoryCache(size_t capacity = 64u << 20);
@@ -31,14 +33,13 @@ protected:
     void Put(const HashId& id, const Object& obj) override;
 
 private:
-    HashId InsertObject(const HashId& id, Object obj);
+    void InsertObject(const HashId& id, Object obj);
 
 private:
     using UsageList = std::list<std::pair<HashId, Object>>;
 
     size_t capacity_;
     size_t size_;
-    mutable std::mutex mutex_;
     mutable UsageList list_;
     std::unordered_map<HashId, UsageList::iterator> objects_;
 };

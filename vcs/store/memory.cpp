@@ -12,8 +12,6 @@ size_t MemoryCache::Size() const noexcept {
 }
 
 DataHeader MemoryCache::GetMeta(const HashId& id) const {
-    std::lock_guard g(mutex_);
-
     if (auto oi = objects_.find(id); oi != objects_.end()) {
         const Object& obj = oi->second->second;
 
@@ -24,14 +22,10 @@ DataHeader MemoryCache::GetMeta(const HashId& id) const {
 }
 
 bool MemoryCache::Exists(const HashId& id) const {
-    std::lock_guard g(mutex_);
-
     return objects_.find(id) != objects_.end();
 }
 
 Object MemoryCache::Load(const HashId& id, const DataType) const {
-    std::lock_guard g(mutex_);
-
     if (auto oi = objects_.find(id); oi != objects_.end()) {
         list_.splice(list_.end(), list_, oi->second);
         return oi->second->second;
@@ -48,28 +42,20 @@ void MemoryCache::Put(const HashId& id, const Object& obj) {
     InsertObject(id, obj);
 }
 
-HashId MemoryCache::InsertObject(const HashId& id, Object obj) {
-    UsageList removed;
-
-    {
-        std::lock_guard g(mutex_);
-        auto oi = objects_.emplace(id, list_.end());
-        if (oi.second) {
-            size_ += obj.Size();
-            // Replace iterator with the real value.
-            oi.first->second = list_.insert(list_.end(), std::make_pair(id, std::move(obj)));
-        }
-        // Free memory.
-        while (!list_.empty() && size_ > capacity_) {
-            size_ -= list_.front().second.Size();
-            // Remove object from map.
-            objects_.erase(list_.front().first);
-            // Keep references to the objects so they can be freed outside the critical section.
-            removed.splice(removed.end(), list_, list_.begin());
-        }
+void MemoryCache::InsertObject(const HashId& id, Object obj) {
+    if (auto oi = objects_.emplace(id, list_.end()); oi.second) {
+        size_ += obj.Size();
+        // Replace iterator with the real value.
+        oi.first->second = list_.insert(list_.end(), std::make_pair(id, std::move(obj)));
     }
-
-    return id;
+    // Free memory.
+    while (!list_.empty() && size_ > capacity_) {
+        size_ -= list_.front().second.Size();
+        // Remove object from map.
+        objects_.erase(list_.front().first);
+        // Remove iterator from the list.
+        list_.pop_front();
+    }
 }
 
 } // namespace Vcs::Store
