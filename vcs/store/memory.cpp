@@ -2,9 +2,8 @@
 
 namespace Vcs::Store {
 
-MemoryCache::MemoryCache(size_t capacity, size_t chunk_size)
-    : Datastore(chunk_size)
-    , capacity_(capacity)
+MemoryCache::MemoryCache(size_t capacity)
+    : capacity_(capacity)
     , size_(0) {
 }
 
@@ -12,7 +11,7 @@ size_t MemoryCache::Size() const noexcept {
     return size_;
 }
 
-DataHeader MemoryCache::DoGetMeta(const HashId& id) const {
+DataHeader MemoryCache::GetMeta(const HashId& id) const {
     std::lock_guard g(mutex_);
 
     if (auto oi = objects_.find(id); oi != objects_.end()) {
@@ -24,13 +23,13 @@ DataHeader MemoryCache::DoGetMeta(const HashId& id) const {
     }
 }
 
-bool MemoryCache::DoIsExists(const HashId& id) const {
+bool MemoryCache::Exists(const HashId& id) const {
     std::lock_guard g(mutex_);
 
     return objects_.find(id) != objects_.end();
 }
 
-Object MemoryCache::DoLoad(const HashId& id, const DataType) const {
+Object MemoryCache::Load(const HashId& id, const DataType) const {
     std::lock_guard g(mutex_);
 
     if (auto oi = objects_.find(id); oi != objects_.end()) {
@@ -41,8 +40,12 @@ Object MemoryCache::DoLoad(const HashId& id, const DataType) const {
     }
 }
 
-HashId MemoryCache::DoPut(DataType type, std::string_view content) {
-    return InsertObject(HashId::Make(type, content), Object::Load(type, content));
+void MemoryCache::Put(const HashId& id, DataType type, std::string_view content) {
+    InsertObject(id, Object::Load(type, content));
+}
+
+void MemoryCache::Put(const HashId& id, const Object& obj) {
+    InsertObject(id, obj);
 }
 
 HashId MemoryCache::InsertObject(const HashId& id, Object obj) {
@@ -54,7 +57,7 @@ HashId MemoryCache::InsertObject(const HashId& id, Object obj) {
         if (oi.second) {
             size_ += obj.Size();
             // Replace iterator with the real value.
-            oi.first->second = list_.insert(list_.end(), std::make_pair(id, obj));
+            oi.first->second = list_.insert(list_.end(), std::make_pair(id, std::move(obj)));
         }
         // Free memory.
         while (!list_.empty() && size_ > capacity_) {

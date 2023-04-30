@@ -114,7 +114,7 @@ void Loose::Enumerate(bool with_metadata, const std::function<bool(const HashId&
     }
 }
 
-DataHeader Loose::DoGetMeta(const HashId& id) const try
+DataHeader Loose::GetMeta(const HashId& id) const try
 {
     auto file = File::ForRead(MakePath(path_, id));
     FileHeader hdr{};
@@ -134,11 +134,11 @@ DataHeader Loose::DoGetMeta(const HashId& id) const try
     throw;
 }
 
-bool Loose::DoIsExists(const HashId& id) const {
+bool Loose::Exists(const HashId& id) const {
     return std::filesystem::exists(MakePath(path_, id));
 }
 
-Object Loose::DoLoad(const HashId& id, const DataType expected) const try
+Object Loose::Load(const HashId& id, const DataType expected) const try
 {
     auto file = File::ForRead(MakePath(path_, id));
     FileHeader hdr{};
@@ -197,12 +197,11 @@ Object Loose::DoLoad(const HashId& id, const DataType expected) const try
     throw;
 }
 
-HashId Loose::DoPut(const DataType type, const std::string_view content) {
+void Loose::Put(const HashId& id, const DataType type, const std::string_view content) {
     if (content.size() > kMaximumContentSize) {
         throw std::length_error(fmt::format("object size exceed {} bytes", kMaximumContentSize));
     }
 
-    auto id = HashId::Make(type, content);
     std::filesystem::create_directories(path_ / id.ToHex().substr(0, 2));
     auto file = File::ForOverwrite(MakePath(path_, id));
     FileHeader hdr{};
@@ -246,8 +245,6 @@ HashId Loose::DoPut(const DataType type, const std::string_view content) {
     if (options_.data_sync) {
         file.FlushData();
     }
-
-    return id;
 }
 
 } // namespace Vcs::Store

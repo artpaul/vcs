@@ -8,20 +8,27 @@
 
 namespace Vcs::Store {
 
-class MemoryCache : public Datastore {
+class MemoryCache : public Datastore::Backend {
 public:
-    explicit MemoryCache(size_t capacity = 64u << 20, size_t chunk_size = 4u << 20);
+    explicit MemoryCache(size_t capacity = 64u << 20);
+
+    template <typename... Args>
+    static auto Make(Args&&... args) {
+        return std::make_shared<MemoryCache>(std::forward<Args>(args)...);
+    }
 
     size_t Size() const noexcept;
 
 protected:
-    DataHeader DoGetMeta(const HashId& id) const override;
+    DataHeader GetMeta(const HashId& id) const override;
 
-    bool DoIsExists(const HashId& id) const override;
+    bool Exists(const HashId& id) const override;
 
-    Object DoLoad(const HashId& id, const DataType expected) const override;
+    Object Load(const HashId& id, const DataType expected) const override;
 
-    HashId DoPut(DataType type, std::string_view content) override;
+    void Put(const HashId& id, DataType type, std::string_view content) override;
+
+    void Put(const HashId& id, const Object& obj) override;
 
 private:
     HashId InsertObject(const HashId& id, Object obj);

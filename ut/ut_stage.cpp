@@ -25,7 +25,7 @@ static HashId MakeLibTree(Datastore* odb) {
 }
 
 TEST(StageArea, Add) {
-    Store::MemoryCache mem;
+    auto mem = Datastore::Make<Store::MemoryCache>();
     StageArea index(&mem);
 
     // Updating of root entry is prohibited.
@@ -42,7 +42,7 @@ TEST(StageArea, Add) {
 }
 
 TEST(StageArea, Copy) {
-    Store::MemoryCache mem;
+    auto mem = Datastore::Make<Store::MemoryCache>();
     StageArea index(&mem, MakeLibTree(&mem));
 
     ASSERT_TRUE(index.Copy("lib/test.h", "util/test.h"));
@@ -67,7 +67,7 @@ TEST(StageArea, Copy) {
 }
 
 TEST(StageArea, GetRoot) {
-    Store::MemoryCache mem;
+    auto mem = Datastore::Make<Store::MemoryCache>();
 
     // The root entry always exists.
     EXPECT_TRUE(StageArea(&mem).GetEntry(""));
@@ -79,7 +79,7 @@ TEST(StageArea, GetRoot) {
 }
 
 TEST(StageArea, GetEntry) {
-    Store::MemoryCache mem;
+    auto mem = Datastore::Make<Store::MemoryCache>();
     StageArea index(&mem, MakeLibTree(&mem));
 
     // Make the index mutable.
@@ -92,7 +92,7 @@ TEST(StageArea, GetEntry) {
 }
 
 TEST(StageArea, ListTree) {
-    Store::MemoryCache mem;
+    auto mem = Datastore::Make<Store::MemoryCache>();
     StageArea index(&mem, MakeLibTree(&mem));
 
     EXPECT_EQ(index.ListTree("").size(), 2u);
@@ -106,7 +106,7 @@ TEST(StageArea, ListTree) {
 }
 
 TEST(StageIndexCase, Move) {
-    Store::MemoryCache mem;
+    auto mem = Datastore::Make<Store::MemoryCache>();
     StageArea index(&mem, MakeLibTree(&mem));
 
     ASSERT_TRUE(index.Copy("lib/test.h", "util/test.h"));
@@ -118,7 +118,7 @@ TEST(StageIndexCase, Move) {
 }
 
 TEST(StageArea, Remove) {
-    Store::MemoryCache mem;
+    auto mem = Datastore::Make<Store::MemoryCache>();
     StageArea index(&mem);
 
     // Removing of root entry is prohibited.
@@ -135,7 +135,7 @@ TEST(StageArea, Remove) {
 }
 
 TEST(StageArea, RestoreRemoved) {
-    Store::MemoryCache mem;
+    auto mem = Datastore::Make<Store::MemoryCache>();
     StageArea index(&mem, MakeLibTree(&mem));
 
     ASSERT_TRUE(index.Remove("lib"));
@@ -156,7 +156,7 @@ TEST(StageArea, RestoreRemoved) {
 }
 
 TEST(StageArea, SaveTree) {
-    Store::MemoryCache mem;
+    auto mem = Datastore::Make<Store::MemoryCache>();
     StageArea index(&mem);
 
     ASSERT_TRUE(index.Add("lib/lib/empty", MakeBlob("", &mem)));
@@ -167,7 +167,7 @@ TEST(StageArea, SaveTree) {
 }
 
 TEST(StageArea, SaveTreeEmpty) {
-    Store::MemoryCache mem;
+    auto mem = Datastore::Make<Store::MemoryCache>();
     StageArea index(&mem);
 
     // Root tree is always valid.
@@ -183,7 +183,7 @@ TEST(StageArea, SaveTreeEmpty) {
 }
 
 TEST(StageArea, SaveTreeUpdate) {
-    Store::MemoryCache mem;
+    auto mem = Datastore::Make<Store::MemoryCache>();
     HashId tree_id;
 
     {
@@ -208,7 +208,7 @@ TEST(StageArea, SaveTreeUpdate) {
 }
 
 TEST(StageArea, SaveTreeChunked) {
-    Store::MemoryCache mem(1 << 20, 1024);
+    auto mem = Datastore(1024).Chain<Store::MemoryCache>(1u << 20);
     StageArea index(&mem);
     const auto blob = MakeBlob("int test();", &mem);
 

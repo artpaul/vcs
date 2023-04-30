@@ -9,6 +9,26 @@ using namespace Vcs;
 
 static constexpr std::string_view text("one line of text");
 
+TEST(Datastore, Cache) {
+    auto mem1 = Store::MemoryCache::Make(1024);
+    auto mem2 = Store::MemoryCache::Make(1024);
+    auto mem3 = Store::MemoryCache::Make(1024);
+
+    // Setup datastore.
+    auto odb = Datastore().Chain(mem1).Chain(mem2).Cache(mem3);
+    // Put blob directly into the first backend.
+    auto id = Datastore().Chain(mem1).Put(DataType::Blob, text);
+
+    ASSERT_EQ(odb.LoadBlob(id), text);
+
+    // Blob was put directly into the first backend.
+    EXPECT_TRUE(Datastore().Chain(mem1).IsExists(id));
+    // Blob was cache in the third backend.
+    EXPECT_TRUE(Datastore().Chain(mem3).IsExists(id));
+    // Blob should not exist in the second backend.
+    EXPECT_FALSE(Datastore().Chain(mem2).IsExists(id));
+}
+
 TEST(MemoryCache, Capacity) {
     std::vector<std::pair<HashId, std::string>> blobs;
     // Make blobs.
@@ -25,7 +45,7 @@ TEST(MemoryCache, Capacity) {
     }
 
     {
-        Store::MemoryCache mem(1024);
+        auto mem = Datastore::Make<Store::MemoryCache>(1024);
         // Put an object.
         mem.Put(DataType::Blob, blobs[0].second);
         // Check that the object exists in the storage.
@@ -39,7 +59,7 @@ TEST(MemoryCache, Capacity) {
     }
 
     {
-        Store::MemoryCache mem(1024);
+        auto mem = Datastore::Make<Store::MemoryCache>(1024);
         // Put and object.
         mem.Put(DataType::Blob, blobs[0].second);
         // Check that the object exists in the storage.
@@ -71,7 +91,7 @@ TEST(MemoryCache, BlobChunked) {
     ASSERT_EQ(content.size(), 8703u);
 
     {
-        Store::MemoryCache mem(4 << 20, 1 << 20);
+        auto mem = Datastore(1u << 20).Chain<Store::MemoryCache>(4u << 20);
         const auto id = mem.Put(DataType::Blob, content);
 
         ASSERT_TRUE(mem.IsExists(id));
@@ -80,7 +100,7 @@ TEST(MemoryCache, BlobChunked) {
     }
 
     {
-        Store::MemoryCache mem(1 << 20, 512);
+        auto mem = Datastore(512).Chain<Store::MemoryCache>(1u << 20);
         const auto id = mem.Put(DataType::Blob, content);
 
         ASSERT_TRUE(mem.IsExists(id));
@@ -101,7 +121,7 @@ TEST(MemoryCache, TreeChunked) {
         );
     }
 
-    Store::MemoryCache mem(1 << 20, 512);
+    auto mem = Datastore(512).Chain<Store::MemoryCache>(1u << 20);
     const auto id = mem.Put(DataType::Tree, builder.Serialize());
 
     ASSERT_TRUE(mem.IsExists(id));

@@ -33,7 +33,7 @@ static HashId MakeTreeUtil(Datastore* odb) {
 }
 
 TEST(ChangelistBuilderTest, Changes) {
-    Store::MemoryCache mem;
+    auto mem = Datastore::Make<Store::MemoryCache>();
 
     HashId tree_lib = MakeTreeLib(&mem);
     HashId tree_util = MakeTreeUtil(&mem);
@@ -61,7 +61,7 @@ TEST(ChangelistBuilderTest, Changes) {
 }
 
 TEST(ChangelistBuilderTest, ChangesNoDirectoryExpansion) {
-    Store::MemoryCache mem;
+    auto mem = Datastore::Make<Store::MemoryCache>();
 
     HashId tree_lib = MakeTreeLib(&mem);
     HashId tree_util = MakeTreeUtil(&mem);
