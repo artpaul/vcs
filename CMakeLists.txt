@@ -21,9 +21,28 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
 
+# Grpc flags.
+set(protobuf_INSTALL OFF)
+set(protobuf_BUILD_TESTS OFF)
+set(BUILD_SHARED_LIBS OFF)
+set(gRPC_BUILD_CSHARP_EXT OFF)
+set(gRPC_BUILD_GRPC_CSHARP_PLUGIN OFF)
+set(gRPC_BUILD_GRPC_NODE_PLUGIN OFF)
+set(gRPC_BUILD_GRPC_OBJECTIVE_C_PLUGIN OFF)
+set(gRPC_BUILD_GRPC_PHP_PLUGIN OFF)
+set(gRPC_BUILD_GRPC_PYTHON_PLUGIN OFF)
+set(gRPC_BUILD_GRPC_RUBY_PLUGIN OFF)
+set(gRPC_BUILD_TESTS OFF)
+set(gRPC_INSTALL OFF)
+
 # Third parties come with their own setup of
 # C++ standard and compiler options.
 add_subdirectory(contrib)
+
+# Grpc
+set(_PROTOBUF_LIBPROTOBUF protobuf::libprotobuf)
+set(_GRPC_GRPCPP grpc++)
+get_target_property(Protobuf_INCLUDE_DIRS protobuf::libprotobuf INTERFACE_INCLUDE_DIRECTORIES)
 
 # Setup C++ standard for the project.
 set(CMAKE_CXX_STANDARD 23)
