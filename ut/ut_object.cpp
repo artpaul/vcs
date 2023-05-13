@@ -166,3 +166,44 @@ TEST(ObjectTree, Serialize) {
     EXPECT_EQ(entry->size(), e.size);
     EXPECT_EQ(static_cast<PathType>(entry->type()), e.type);
 }
+
+TEST(RangeIterator, RandomAccessIterator) {
+    struct RangeVector {
+        static int Item(const void* p, size_t i) {
+            return static_cast<const std::vector<int>*>(p)->at(i);
+        }
+
+        static size_t Size(const void* p) {
+            return static_cast<const std::vector<int>*>(p)->size();
+        }
+    };
+
+    const std::vector<int> nums = {1, 3, 5, 7, 9, 11};
+
+#define TEST_SEMANTIC(expr) \
+   { \
+      RepeatedField<int, RangeVector>::iterator a(&nums, 1); \
+      RepeatedField<int, RangeVector>::iterator b(&nums, 4); \
+      [[maybe_unused]] const auto n = std::distance(a, b); \
+      expr; \
+   }
+
+    static_assert(std::is_same_v<
+                  std::iterator_traits<RepeatedField<int, RangeVector>::iterator>::iterator_category,
+                  std::random_access_iterator_tag>);
+
+    TEST_SEMANTIC(EXPECT_EQ((a += n), b));
+    TEST_SEMANTIC(EXPECT_EQ(std::addressof(a += n), std::addressof(a)));
+    TEST_SEMANTIC(EXPECT_EQ(std::addressof(b -= n), std::addressof(b)));
+    TEST_SEMANTIC(EXPECT_EQ((a + n), (a += n)));
+    TEST_SEMANTIC(EXPECT_EQ((a + n), (n + a)));
+    TEST_SEMANTIC(EXPECT_EQ((a + 0), a));
+    TEST_SEMANTIC(EXPECT_EQ((a + (n - 1)), (--b)));
+    TEST_SEMANTIC(EXPECT_EQ((b += -n), a));
+    TEST_SEMANTIC(EXPECT_EQ((b -= n), a));
+    TEST_SEMANTIC(EXPECT_EQ((b - n), (b -= n)));
+    TEST_SEMANTIC(EXPECT_EQ(a[n], *b));
+    TEST_SEMANTIC(EXPECT_TRUE(a <= b));
+
+#undef TEST_SEMANTIC
+}

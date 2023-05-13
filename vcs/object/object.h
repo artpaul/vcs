@@ -61,17 +61,25 @@ class RepeatedField {
 public:
     class iterator {
     public:
+        using iterator_category = std::random_access_iterator_tag;
+        using difference_type = std::ptrdiff_t;
+        using value_type = const T;
+        using pointer = const T*;
+        using reference = const T&;
+
         constexpr iterator(const void* p, size_t i) noexcept
             : p_(p)
             , i_(i) {
         }
 
-        constexpr bool operator==(const iterator& other) const noexcept {
-            return p_ == other.p_ && i_ == other.i_;
+        const T operator*() const {
+            assert(i_ < A::Size(p_));
+            return A::Item(p_, i_);
         }
 
-        constexpr bool operator<(const iterator& other) const noexcept {
-            return std::less<const void*>(p_ < other.p_) || (p_ == other.p_ && i_ < other.i_);
+        const T operator[](const size_t n) const {
+            assert(i_ + n < A::Size(p_));
+            return A::Item(p_, i_ + n);
         }
 
         constexpr iterator& operator++() noexcept {
@@ -79,9 +87,53 @@ public:
             return *this;
         }
 
-        T operator*() const {
-            assert(p_);
-            return A::Item(p_, i_);
+        constexpr iterator operator++(int) noexcept {
+            return iterator(p_, i_++);
+        }
+
+        constexpr iterator& operator--() noexcept {
+            --i_;
+            return *this;
+        }
+
+        constexpr iterator operator--(int) noexcept {
+            return iterator(p_, i_--);
+        }
+
+        constexpr iterator& operator+=(const difference_type n) noexcept {
+            i_ += n;
+            return *this;
+        }
+
+        constexpr iterator& operator-=(const difference_type n) noexcept {
+            assert(difference_type(i_) >= n);
+            i_ -= n;
+            return *this;
+        }
+
+        constexpr bool operator==(const iterator& other) const noexcept {
+            return p_ == other.p_ && i_ == other.i_;
+        }
+
+        constexpr auto operator<=>(const iterator& other) const noexcept {
+            return std::make_tuple(p_, i_) <=> std::make_tuple(other.p_, other.i_);
+        }
+
+        friend constexpr iterator operator+(const iterator& lhs, const difference_type n) noexcept {
+            return iterator(lhs.p_, lhs.i_ + n);
+        }
+
+        friend constexpr iterator operator+(const difference_type n, const iterator& lhs) noexcept {
+            return iterator(lhs.p_, lhs.i_ + n);
+        }
+
+        friend constexpr iterator operator-(const iterator& lhs, const difference_type n) noexcept {
+            return iterator(lhs.p_, lhs.i_ - n);
+        }
+
+        friend constexpr difference_type operator-(const iterator& lhs, const iterator& rhs) noexcept {
+            assert(lhs.p_ == rhs.p_);
+            return lhs.i_ - rhs.i_;
         }
 
     private:
