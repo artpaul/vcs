@@ -58,6 +58,7 @@ target_sources(libvcs3 PRIVATE
     "object/object.cpp"
     "object/serialize.cpp"
     "object/store.cpp"
+    "store/collect.cpp"
     "store/loose.cpp"
     "store/memory.cpp"
 )
@@ -69,10 +70,4 @@ target_sources(libvcs3 PRIVATE
     "${CMAKE_CURRENT_BINARY_DIR}/api/fbs/tag.fb.h"
     "${CMAKE_CURRENT_BINARY_DIR}/api/fbs/tree.fb.h"
     "${CMAKE_CURRENT_BINARY_DIR}/api/fbs/types.fb.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/api/fbs/commit.fbs"
-    "${CMAKE_CURRENT_SOURCE_DIR}/api/fbs/index.fbs"
-    "${CMAKE_CURRENT_SOURCE_DIR}/api/fbs/renames.fbs"
-    "${CMAKE_CURRENT_SOURCE_DIR}/api/fbs/tag.fbs"
-    "${CMAKE_CURRENT_SOURCE_DIR}/api/fbs/tree.fbs"
-    "${CMAKE_CURRENT_SOURCE_DIR}/api/fbs/types.fbs"
 )

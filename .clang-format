@@ -82,7 +82,7 @@ IncludeCategories:
     CaseSensitive:   false
     SortPriority:    2
 
-  - Regex:           '^<(ut|vcs)/.*\.h>'
+  - Regex:           '^<(cmd|ut|vcs)/.*\.h>'
     Priority:        2
     CaseSensitive:   false
 

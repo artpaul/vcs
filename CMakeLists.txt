@@ -19,6 +19,7 @@ endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wnon-virtual-dtor -Werror")
 
+add_subdirectory(cmd)
 add_subdirectory(contrib)
 add_subdirectory(vcs)
 add_subdirectory(util)
