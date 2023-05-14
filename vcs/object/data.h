@@ -11,8 +11,8 @@ namespace Vcs {
  * Types of compression algorithms.
  */
 enum class Compression : uint8_t {
-    None = 0,
-    Lz4 = 1,
+    None = 1,
+    Lz4 = 2,
 };
 
 /**
