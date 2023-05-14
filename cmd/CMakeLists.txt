@@ -2,10 +2,12 @@ add_executable(vcs)
 add_library(vcs-local)
 
 target_link_libraries(vcs-local
+    contrib-lmdb
     libvcs3
 )
 
 target_sources(vcs-local PRIVATE
+    "local/db.cpp"
     "local/bare.cpp"
     "local/workspace.cpp"
     "local/worktree.cpp"

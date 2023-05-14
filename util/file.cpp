@@ -1,9 +1,9 @@
 #include "file.h"
 
-#include <system_error>
-
 #include <contrib/fmt/fmt/format.h>
 #include <contrib/fmt/fmt/std.h>
+
+#include <system_error>
 
 #if defined(_unix_)
 #   include <errno.h>
@@ -129,4 +129,27 @@ size_t File::Size() const {
     } else {
         return buf.st_size;
     }
+}
+
+void StringToFile(const std::filesystem::path& path, const std::string_view value) {
+    auto file = File::ForOverwrite(path);
+
+    for (const char *p = value.data(), *end = value.data() + value.size(); p != end;) {
+        p += file.Write(p, end - p);
+    }
+}
+
+std::string StringFromFile(const std::filesystem::path& path) {
+    auto file = File::ForRead(path);
+    std::string result;
+
+    result.reserve(file.Size());
+
+    char buf[4096];
+
+    while (size_t read = file.Read(buf, sizeof(buf))) {
+        result.append(buf, read);
+    }
+
+    return result;
 }

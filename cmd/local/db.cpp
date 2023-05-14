@@ -1,0 +1,125 @@
+#include "db.h"
+
+#include <contrib/fmt/fmt/format.h>
+#include <contrib/liblmdb/lmdb.h>
+
+namespace Vcs {
+
+class KeyValueDatabase::Impl {
+public:
+    Impl(const std::filesystem::path& path)
+        : env_(nullptr) {
+        int rc = mdb_env_create(&env_);
+        if (rc != 0) {
+            throw std::runtime_error(fmt::format("cannot create env handle: {}", mdb_strerror(rc)));
+        }
+        mdb_env_set_mapsize(env_, 1ull << 30);
+        rc = mdb_env_open(env_, path.c_str(), 0, 0664);
+        if (rc != 0) {
+            throw std::runtime_error(fmt::format("cannot open lmdb environment: {}", mdb_strerror(rc)));
+        }
+    }
+
+    ~Impl() {
+        if (env_) {
+            mdb_env_close(env_);
+        }
+    }
+
+    void Delete(const std::string_view key) {
+        (void)key;
+    }
+
+    std::optional<std::string> Get(const std::string_view k) const {
+        MDB_dbi dbi;
+        MDB_txn* txn = nullptr;
+
+        int rc = mdb_txn_begin(env_, NULL, MDB_RDONLY, &txn);
+        if (rc != 0) {
+            throw std::runtime_error(fmt::format("cannot start transaction: {}", mdb_strerror(rc)));
+        }
+        rc = mdb_dbi_open(txn, NULL, 0, &dbi);
+        if (rc != 0) {
+            throw std::runtime_error(fmt::format("cannot open database: {}", mdb_strerror(rc)));
+        }
+
+        MDB_val key;
+        MDB_val val;
+
+        key.mv_data = (void*)k.data();
+        key.mv_size = k.size();
+        rc = mdb_get(txn, dbi, &key, &val);
+        if (rc != 0) {
+            mdb_txn_abort(txn);
+
+            if (rc == MDB_NOTFOUND) {
+                return std::nullopt;
+            }
+
+            throw std::runtime_error(fmt::format("cannot get data: {}", mdb_strerror(rc)));
+        }
+
+        auto result = std::make_optional<std::string>((const char*)val.mv_data, val.mv_size);
+
+        mdb_txn_abort(txn);
+
+        return result;
+    }
+
+    void Put(const std::string_view k, const std::string_view value) {
+        MDB_dbi dbi;
+        MDB_txn* txn = nullptr;
+        int rc = mdb_txn_begin(env_, nullptr, 0, &txn);
+        if (rc != 0) {
+            throw std::runtime_error(fmt::format("cannot start transaction: {}", mdb_strerror(rc)));
+        }
+        rc = mdb_dbi_open(txn, nullptr, 0, &dbi);
+        if (rc != 0) {
+            throw std::runtime_error(fmt::format("cannot open database: {}", mdb_strerror(rc)));
+        }
+
+        MDB_val key;
+        MDB_val val;
+        key.mv_size = k.size();
+        key.mv_data = (void*)k.data();
+        val.mv_size = value.size();
+        val.mv_data = (void*)value.data();
+
+        rc = mdb_put(txn, dbi, &key, &val, 0);
+        if (rc != 0) {
+            mdb_dbi_close(env_, dbi);
+            throw std::runtime_error(fmt::format("cannot put data: {}", mdb_strerror(rc)));
+        }
+        rc = mdb_txn_commit(txn);
+        if (rc != 0) {
+            mdb_dbi_close(env_, dbi);
+            throw std::runtime_error(fmt::format("cannot commit: {}", mdb_strerror(rc)));
+        }
+
+        mdb_dbi_close(env_, dbi);
+    }
+
+private:
+    MDB_env* env_;
+};
+
+KeyValueDatabase::KeyValueDatabase(const std::filesystem::path& path)
+    : impl_(std::make_unique<Impl>(path)) {
+}
+
+KeyValueDatabase::~KeyValueDatabase() {
+}
+
+void KeyValueDatabase::Delete(const std::string_view key) {
+    impl_->Delete(key);
+}
+
+std::optional<std::string> KeyValueDatabase::Get(const std::string_view key) const {
+    return impl_->Get(key);
+}
+
+void KeyValueDatabase::Put(const std::string_view key, const std::string_view value) {
+    impl_->Put(key, value);
+}
+
+} // namespace Vcs

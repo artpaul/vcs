@@ -62,3 +62,7 @@ private:
 private:
     FHANDLE fd_;
 };
+
+void StringToFile(const std::filesystem::path& path, const std::string_view value);
+
+std::string StringFromFile(const std::filesystem::path& path);

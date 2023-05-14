@@ -4,6 +4,7 @@
 
 #include <contrib/cxxopts/cxxopts.hpp>
 #include <contrib/fmt/fmt/format.h>
+#include <contrib/fmt/fmt/std.h>
 
 #include <unordered_map>
 
@@ -13,8 +14,8 @@ namespace {
 int ExecuteConvert(int argc, char* argv[]) {
     struct {
         std::string branch;
-        std::string path;
-        std::string target_path;
+        std::filesystem::path path;
+        std::filesystem::path target_path;
         bool bare = false;
     } options;
 
@@ -24,10 +25,10 @@ int ExecuteConvert(int argc, char* argv[]) {
             "",
             {
                 {"h,help", "show help"},
-                {"git", "path to git repository", cxxopts::value(options.path)},
+                {"git", "path to git repository", cxxopts::value<std::string>()},
                 {"b,branch", "branch to convert", cxxopts::value(options.branch)->default_value("master")},
                 {"bare", "create a bare repository", cxxopts::value(options.bare)},
-                {"path", "path to target repository", cxxopts::value(options.target_path)},
+                {"path", "path to target repository", cxxopts::value<std::string>()},
             }
         );
         spec.custom_help("[<options>]");
@@ -40,11 +41,16 @@ int ExecuteConvert(int argc, char* argv[]) {
             return 0;
         }
 
-        if (options.target_path.empty()) {
+        if (result.has("path")) {
+            options.target_path = result["path"].as<std::string>();
+
+        } else {
             fmt::print(stderr, "error: path should be defined\n");
             return 1;
         }
-        if (options.path.empty()) {
+        if (result.has("git")) {
+            options.path = result["git"].as<std::string>();
+        } else {
             fmt::print(stderr, "error: git path should be defined\n");
             return 1;
         }
@@ -69,15 +75,19 @@ int ExecuteConvert(int argc, char* argv[]) {
         return WalkAction::Continue;
     });
 
+    const auto bare_path = options.bare ? options.target_path : options.target_path / ".vcs";
+
     // Initialize target repository.
     if (options.bare) {
-        Repository::Initialize(options.target_path);
+        Repository::Initialize(bare_path);
     } else {
-        fmt::print(stderr, "error: non bare is not implemented");
-        return 1;
+        // Create working area.
+        std::filesystem::create_directories(options.path);
+        // Create bare repository.
+        Repository::Initialize(bare_path);
     }
 
-    Repository repo(options.target_path);
+    Repository repo(bare_path);
 
     HashId last;
     // Converting commits.
@@ -94,6 +104,29 @@ int ExecuteConvert(int argc, char* argv[]) {
         }
 
         remap.emplace(id, last);
+    }
+
+    repo.CreateBranch(options.branch, last);
+
+    // Create and set a branch.
+    if (const auto& b = repo.GetBranch(options.branch)) {
+        fmt::print("branch '{}' set to {}\n", options.branch, b->head);
+    } else {
+        return 1;
+    }
+
+    // Create a workspace if requested.
+    if (!options.bare) {
+        const auto ws = Repository::Workspace{
+            .name = "main",
+            .path = options.target_path,
+            .head = last,
+        };
+
+        if (!repo.CreateWorkspace(ws, true)) {
+            fmt::print(stderr, "error: cannot create workspace at '{}'\n", options.target_path);
+            return 1;
+        }
     }
 
     return 0;
