@@ -11,8 +11,8 @@ namespace {
 
 struct Options { };
 
-void BranchInfo(const Options&, const Workspace&) {
-    fmt::print("On branch ...\n");
+void BranchInfo(const Options&, const Workspace& repo) {
+    fmt::print("On branch {}\n", repo.GetCurrentBranch().name);
 }
 
 void ChangesInfo(const Options&, const Workspace& repo) {

@@ -43,13 +43,14 @@ int ExecuteConvert(int argc, char* argv[]) {
 
         if (result.has("path")) {
             options.target_path = result["path"].as<std::string>();
-
+            options.target_path = std::filesystem::absolute(options.target_path);
         } else {
             fmt::print(stderr, "error: path should be defined\n");
             return 1;
         }
         if (result.has("git")) {
             options.path = result["git"].as<std::string>();
+            options.path = std::filesystem::absolute(options.path);
         } else {
             fmt::print(stderr, "error: git path should be defined\n");
             return 1;
@@ -120,7 +121,7 @@ int ExecuteConvert(int argc, char* argv[]) {
         const auto ws = Repository::Workspace{
             .name = "main",
             .path = options.target_path,
-            .head = last,
+            .branch = options.branch,
         };
 
         if (!repo.CreateWorkspace(ws, true)) {

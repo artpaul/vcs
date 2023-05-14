@@ -21,7 +21,20 @@ public:
 
 public:
     /**
-     * @name Working area
+     * @name References
+     * @{
+     */
+
+    /**
+     * Returns state of the current branch.
+     */
+    Branch GetCurrentBranch() const;
+
+    /**@}*/
+
+public:
+    /**
+     * @name Working tree
      * @{
      */
 
@@ -34,6 +47,8 @@ public:
     /**@}*/
 
 private:
+    std::filesystem::path state_path_;
+
     std::unique_ptr<WorkingTree> working_tree_;
 };
 

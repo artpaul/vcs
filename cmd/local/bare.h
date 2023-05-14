@@ -26,8 +26,8 @@ public:
         std::string name;
         /// Location of working tree.
         std::filesystem::path path;
-        /// Current commit.
-        HashId head;
+        /// Current branch.
+        std::string branch;
         /// Base of working tree.
         HashId tree;
 

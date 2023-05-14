@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <optional>
 
@@ -12,6 +13,8 @@ public:
     ~KeyValueDatabase();
 
     void Delete(const std::string_view key);
+
+    void Enumerate(const std::function<bool(const std::string_view, const std::string_view)>& cb) const;
 
     std::optional<std::string> Get(const std::string_view key) const;
 
@@ -31,6 +34,12 @@ public:
 
     void Delete(const std::string_view key) {
         db_.Delete(key);
+    }
+
+    void Enumerate(const std::function<bool(const std::string_view, const T&)>& cb) const {
+        db_.Enumerate([&cb](const std::string_view key, const std::string_view value) {
+            return cb(key, T::Load(value));
+        });
     }
 
     std::optional<T> Get(const std::string_view key) const {

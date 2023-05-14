@@ -83,27 +83,33 @@ const Datastore Repository::Objects() const {
 }
 
 bool Repository::CreateWorkspace(const Workspace& params, bool checkout) {
-    // Check there is no workspace with same name.
-    if (workspaces_->Get(params.name)) {
+    // Check there is no workspace with same path.
+    if (workspaces_->Get(params.path.string())) {
+        return false;
+    }
+
+    const auto branch = branches_->Get(params.branch);
+
+    if (!branch) {
         return false;
     }
 
     const auto state_path = bare_path_ / "workspaces" / params.name;
     const auto tree =
-        params.tree ? params.tree : (params.head ? odb_.LoadCommit(params.head).Tree() : HashId());
+        params.tree ? params.tree : (branch->head ? odb_.LoadCommit(branch->head).Tree() : HashId());
 
     // Create state path.
     std::filesystem::create_directory(state_path);
 
     // Write head.
-    StringToFile(state_path / "HEAD", params.head.ToHex());
+    StringToFile(state_path / "HEAD", params.branch);
     // Write base tree.
     StringToFile(state_path / "TREE", tree.ToHex());
 
     // Create working tree path.
     std::filesystem::create_directories(params.path);
     // Save info into the database.
-    workspaces_->Put(params.name, params);
+    workspaces_->Put(params.path.string(), params);
 
     // Checkout revision's content.
     if (checkout) {
@@ -117,7 +123,7 @@ std::optional<Repository::Workspace> Repository::GetWorkspace(const std::string&
     if (auto ws = workspaces_->Get(name)) {
         const auto state_path = bare_path_ / "workspaces" / ws->name;
 
-        ws->head = HashId::FromHex(StringFromFile(state_path / "HEAD"));
+        ws->branch = StringFromFile(state_path / "HEAD");
         ws->tree = HashId::FromHex(StringFromFile(state_path / "TREE"));
 
         return ws;
