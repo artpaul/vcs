@@ -8,6 +8,7 @@
 
 namespace Vcs {
 
+class StageArea;
 class WorkingTree;
 
 /**
@@ -47,7 +48,12 @@ public:
     /**@}*/
 
 private:
+    StageArea* GetStage() const;
+
+private:
     std::filesystem::path state_path_;
+
+    mutable std::unique_ptr<StageArea> stage_;
 
     std::unique_ptr<WorkingTree> working_tree_;
 };

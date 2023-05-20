@@ -9,6 +9,7 @@ namespace Vcs {
 
 extern int ExecuteGit(int argc, char* argv[]);
 extern int ExecuteInit(int argc, char* argv[]);
+extern int ExecuteBranch(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteStatus(int argc, char* argv[], const std::function<Workspace&()>& cb);
 
 static int Main(int argc, char* argv[]) {
@@ -66,6 +67,8 @@ static int Main(int argc, char* argv[]) {
         case Action::Git:
             return ExecuteGit(argc - 1, argv + 1);
 
+        case Action::Branch:
+            return ExecuteBranch(argc - 1, argv + 1, get_workspace);
         case Action::Clean:
             break;
         case Action::Commit:

@@ -1,6 +1,8 @@
 #include "workspace.h"
 #include "worktree.h"
 
+#include <vcs/changes/stage.h>
+
 #include <util/file.h>
 
 #include <contrib/fmt/fmt/std.h>
@@ -28,7 +30,30 @@ auto Workspace::GetCurrentBranch() const -> Branch {
 }
 
 void Workspace::Status(const StatusOptions& options, const StatusCallback& cb) const {
-    working_tree_->Status(options, StageArea(odb_), cb);
+    working_tree_->Status(options, *GetStage(), cb);
+}
+
+StageArea* Workspace::GetStage() const {
+    if (stage_) {
+        return stage_.get();
+    }
+
+    // if (std::filesystem::exists(state_path_ / "stage"))
+    //{
+    //  TODO: load from file
+    //} else
+    {
+        const auto& branch = GetCurrentBranch();
+        HashId tree_id;
+
+        if (branch.head) {
+            tree_id = odb_.LoadCommit(branch.head).Tree();
+        }
+
+        stage_ = std::make_unique<StageArea>(odb_, tree_id);
+    }
+
+    return stage_.get();
 }
 
 } // namespace Vcs

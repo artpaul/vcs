@@ -74,6 +74,16 @@ std::optional<Repository::Branch> Repository::GetBranch(const std::string& name)
     return branches_->Get(name);
 }
 
+void Repository::ListBranches(const std::function<void(const Branch& branch)>& cb) const {
+    if (!cb) {
+        return;
+    }
+    branches_->Enumerate([&](const std::string_view, const Branch& branch) {
+        cb(branch);
+        return true;
+    });
+}
+
 Datastore Repository::Objects() {
     return odb_;
 }

@@ -6,6 +6,7 @@ namespace Vcs {
 
 static const std::unordered_map<std::string_view, Action> actions = {
     // Actions.
+    {"branch", Action::Branch},
     {"clean", Action::Clean},
     {"commit", Action::Commit},
     {"init", Action::Init},
@@ -18,6 +19,7 @@ static const std::unordered_map<std::string_view, Action> actions = {
     {"workspace", Action::Workspace},
 
     // Shortcuts.
+    {"br", Action::Branch},
     {"ci", Action::Commit},
     {"st", Action::Status},
     {"sw", Action::Switch},

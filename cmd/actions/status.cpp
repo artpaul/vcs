@@ -1,6 +1,9 @@
 #include <cmd/local/workspace.h>
 
+#include <util/tty.h>
+
 #include <contrib/cxxopts/cxxopts.hpp>
+#include <contrib/fmt/fmt/color.h>
 #include <contrib/fmt/fmt/format.h>
 
 #include <functional>
@@ -12,13 +15,25 @@ namespace {
 struct Options { };
 
 void BranchInfo(const Options&, const Workspace& repo) {
-    fmt::print("On branch {}\n", repo.GetCurrentBranch().name);
+    const auto& branch = repo.GetCurrentBranch();
+
+    fmt::print(
+        "On branch {}\n",
+        fmt::styled(
+            branch.name,
+            util::is_atty(stdout) ? fmt::fg(fmt::terminal_color::bright_magenta) : fmt::text_style()
+        )
+    );
 }
 
 void ChangesInfo(const Options&, const Workspace& repo) {
+    std::vector<PathStatus> tracked;
     std::vector<PathStatus> untracked;
 
     repo.Status(StatusOptions(), [&](const PathStatus& status) {
+        if (status.status == PathStatus::Deleted || status.status == PathStatus::Modified) {
+            tracked.push_back(status);
+        }
         if (status.status == PathStatus::Untracked) {
             untracked.push_back(status);
         }
@@ -29,8 +44,43 @@ void ChangesInfo(const Options&, const Workspace& repo) {
         std::sort(paths.begin(), paths.end(), [](const auto& a, const auto& b) { return a.path < b.path; });
     };
 
+    process_paths(tracked);
     process_paths(untracked);
 
+    if (tracked.size()) {
+        fmt::print("\nChanges not staged for commit:\n");
+        fmt::print("  (use \"vcs add <file>...\" to update what will be commited)\n");
+        fmt::print("  (use \"vcs restore <file>...\" to discard changes in working directory)\n");
+
+        for (const auto& status : tracked) {
+            const auto status_name = [&] {
+                if (status.status == PathStatus::Modified) {
+                    return "modified:   ";
+                } else if (status.status == PathStatus::Deleted) {
+                    return "deleted:    ";
+                }
+                return "";
+            };
+
+            const auto status_style = [&] {
+                if (util::is_atty(stdout)) {
+                    return fmt::fg(fmt::terminal_color::red);
+                } else {
+                    return fmt::text_style();
+                }
+            };
+
+            fmt::print(
+                "\t{}\n", fmt::styled(
+                              fmt::format(
+                                  "{}{}{}", status_name(), status.path,
+                                  (status.type == PathType::Directory ? "/" : "")
+                              ),
+                              status_style()
+                          )
+            );
+        }
+    }
     if (untracked.size()) {
         fmt::print("\nUntracked files:\n");
         fmt::print("  (use \"vcs add <file>...\" if you want to track changes to file)\n");

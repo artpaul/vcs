@@ -22,6 +22,7 @@ target_link_libraries(vcs
 target_sources(vcs PRIVATE
     "main.cpp"
     "actions.cpp"
+    "actions/branch.cpp"
     "actions/git.cpp"
     "actions/init.cpp"
     "actions/status.cpp"

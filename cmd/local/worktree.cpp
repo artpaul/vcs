@@ -4,9 +4,67 @@
 
 #include <contrib/fmt/fmt/std.h>
 
+#include <map>
 #include <queue>
+#include <stack>
 
 namespace Vcs {
+namespace {
+
+class StatusState {
+public:
+    StatusState() = default;
+
+    StatusState(std::string path)
+        : path_(std::move(path)) {
+    }
+
+    StatusState(std::string path, const std::vector<std::pair<std::string, PathEntry>>& entries)
+        : path_(path) {
+        for (const auto& e : entries) {
+            entries_.emplace(e.first, std::make_pair(e.second, false));
+        }
+    }
+
+    void EnumerateDeleted(const std::function<void(const std::string&, const PathEntry&)>& cb) const {
+        for (const auto& e : entries_) {
+            if (e.second.second) {
+                continue;
+            }
+
+            cb(JoinPath(path_, e.first), e.second.first);
+        }
+    }
+
+    const PathEntry* Find(const std::string_view name) {
+        if (auto ei = entries_.find(name); ei != entries_.end()) {
+            ei->second.second = true;
+            return &ei->second.first;
+        }
+        return nullptr;
+    }
+
+    std::string JoinPath(const std::string_view name) const {
+        return JoinPath(path_, name);
+    }
+
+private:
+    static std::string JoinPath(std::string path, const std::string_view name) {
+        if (path.empty()) {
+            return std::string(name);
+        } else {
+            path.append("/");
+            path.append(name);
+            return path;
+        }
+    }
+
+private:
+    std::string path_;
+    std::map<std::string, std::pair<PathEntry, bool>, std::less<>> entries_;
+};
+
+} // namespace
 
 WorkingTree::WorkingTree(const std::filesystem::path& path, Datastore odb)
     : path_(path)
@@ -82,26 +140,103 @@ void WorkingTree::WriteBlob(const std::filesystem::path& path, const PathEntry& 
     }
 }
 
+static bool
+CompareBlobEntry(const PathEntry& entry, const std::filesystem::directory_entry& de, const Datastore&) {
+    if (de.is_regular_file()) {
+        return entry.size == de.file_size();
+    } else if (de.is_symlink()) {
+        ;
+    }
+
+    return true;
+}
+
 void WorkingTree::Status(const StatusOptions& options, const StageArea& stage, const StatusCallback& cb)
     const {
     auto di = std::filesystem::recursive_directory_iterator(path_);
 
-    (void)options;
-    (void)stage;
+    std::stack<StatusState> state;
+
+    state.emplace(std::string(), stage.ListTree(std::string()));
+
+    const auto emit_deleted = [&](const size_t depth) {
+        while (state.size() > depth) {
+            if (options.tracked) {
+                state.top().EnumerateDeleted([&](const std::string& path, const PathEntry& entry) {
+                    cb(PathStatus().SetPath(path).SetStatus(PathStatus::Deleted).SetType(entry.type));
+                });
+            }
+
+            state.pop();
+        }
+    };
 
     for (const auto& entry : di) {
-        const auto& filename = entry.path().filename();
-        const auto& path = std::filesystem::relative(entry.path(), path_);
+        const auto& filename = entry.path().filename().string();
+        const auto& path = std::filesystem::relative(entry.path(), path_).string();
+
+        //
+        emit_deleted(di.depth() + 1);
+
+        //
+        if (di.depth() == 0 && filename == ".vcs") {
+            if (entry.is_directory()) {
+                di.disable_recursion_pending();
+            }
+            continue;
+        }
 
         if (entry.is_directory()) {
-            if (di.depth() == 0 && filename == ".vcs") {
-                di.disable_recursion_pending();
-                continue;
+            if (const auto ei = state.top().Find(filename)) {
+                if (IsDirectory(ei->type)) {
+                    // Emplace entries on entering a directory.
+                    state.emplace(path, stage.ListTree(path));
+                } else {
+                    // type change
+                }
+            } else {
+                // Emit untracked status.
+                if (options.untracked != Expansion::None) {
+                    cb(PathStatus()
+                           .SetPath(path)
+                           .SetStatus(PathStatus::Untracked)
+                           .SetType(PathType::Directory));
+                }
+                // Skip subtree if there is no need to expand it.
+                if (options.untracked != Expansion::All) {
+                    di.disable_recursion_pending();
+                }
             }
-        } else if (entry.is_regular_file()) {
-            cb(PathStatus().SetPath(path).SetStatus(PathStatus::Untracked).SetType(PathType::File));
+        } else if (entry.is_regular_file() || entry.is_symlink()) {
+            const auto path_type = entry.is_regular_file() ? PathType::File : PathType::Symlink;
+
+            if (const auto ei = state.top().Find(filename)) {
+                if (IsDirectory(ei->type)) {
+                    // Previous directory entry.
+                    if (options.tracked) {
+                        cb(PathStatus()
+                               .SetPath(path)
+                               .SetStatus(PathStatus::Deleted)
+                               .SetType(PathType::Directory));
+                    }
+                    // Current file entry.
+                    if (options.untracked != Expansion::None) {
+                        cb(PathStatus().SetPath(path).SetStatus(PathStatus::Untracked).SetType(path_type));
+                    }
+                } else if (options.tracked) {
+                    if (CompareBlobEntry(*ei, entry, odb_)) {
+                        continue;
+                    }
+
+                    cb(PathStatus().SetPath(path).SetStatus(PathStatus::Modified).SetType(path_type));
+                }
+            } else if (options.untracked != Expansion::None) {
+                cb(PathStatus().SetPath(path).SetStatus(PathStatus::Untracked).SetType(path_type));
+            }
         }
     }
+
+    emit_deleted(0);
 }
 
 } // namespace Vcs

@@ -7,6 +7,8 @@ namespace Vcs {
 enum class Action {
     Unknown = 0,
 
+    /// List, create, or delete branches.
+    Branch,
     /// Remove untracked files from the working tree.
     Clean,
     /// Record changes to the repository.

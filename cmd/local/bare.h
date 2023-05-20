@@ -58,6 +58,11 @@ public:
      */
     std::optional<Branch> GetBranch(const std::string& name) const;
 
+    /**
+     * Lists local branches.
+     */
+    void ListBranches(const std::function<void(const Branch& branch)>& cb) const;
+
     /**@}*/
 
 public:
