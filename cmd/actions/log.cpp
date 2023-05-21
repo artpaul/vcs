@@ -1,0 +1,147 @@
+#include <cmd/local/workspace.h>
+
+#include <util/tty.h>
+
+#include <contrib/cxxopts/cxxopts.hpp>
+#include <contrib/fmt/fmt/color.h>
+#include <contrib/fmt/fmt/format.h>
+
+#include <ctime>
+#include <limits>
+
+namespace Vcs {
+namespace {
+
+struct Options {
+    HashId head;
+    /// Maximum number of commits to output.
+    uint64_t count = std::numeric_limits<uint64_t>::max();
+    /// Use only one line for each log entry.
+    bool oneline = false;
+};
+
+std::string_view MessageTitle(const std::string_view msg) noexcept {
+    auto pos = msg.find('\n');
+    if (pos == std::string_view::npos) {
+        return msg;
+    } else {
+        return msg.substr(0, pos);
+    }
+}
+
+std::vector<std::string_view> MessageLines(const std::string_view msg) {
+    std::vector<std::string_view> lines;
+
+    for (size_t i = 0, end = msg.size(); i < end;) {
+        while (i < end && std::isspace(msg[i])) {
+            ++i;
+        }
+
+        size_t l = i;
+        while (i < msg.size() && msg[i] != '\n') {
+            ++i;
+        }
+        size_t r = i - 1;
+        while (l < r) {
+            if (std::isspace(msg[r])) {
+                --r;
+            } else {
+                lines.push_back(msg.substr(l, r - l + 1));
+                break;
+            }
+        }
+    }
+
+    return lines;
+}
+
+int Execute(const Options& options, const Workspace& repo) {
+    uint64_t count = 0u;
+
+    const auto head_style = [] {
+        if (util::is_atty(stdout)) {
+            return fmt::fg(fmt::terminal_color::yellow);
+        } else {
+            return fmt::text_style();
+        }
+    };
+
+    const auto date_string = [](const std::time_t ts) {
+        char buf[64];
+
+        return std::string(buf, std::strftime(buf, sizeof(buf), "%c %z", std::localtime(&ts)));
+    };
+
+    const auto print_commit = [&](const HashId& id, const Commit& c) {
+        // Header.
+        fmt::print("{}\n", fmt::styled(fmt::format("commit {}", id), head_style()));
+        // Author.
+        fmt::print(
+            "Author: {}{}\n",
+            //
+            c.Author().Name(),
+            //
+            c.Author().Id().empty() ? "" : fmt::format(" <{}>", c.Author().Id())
+        );
+        // Date.
+        fmt::print("Date:   {}\n", date_string(c.Timestamp() / 1'000'000));
+        // Message.
+        if (const auto& lines = MessageLines(c.Message()); !lines.empty()) {
+            fmt::print("\n");
+            for (const auto& line : lines) {
+                fmt::print("    {}\n", line);
+            }
+        }
+    };
+
+    repo.Log(LogOptions().Push(options.head), [&](const HashId& id, const Commit& c) {
+        ++count;
+
+        if (options.oneline) {
+            fmt::print("{} {}\n", fmt::styled(id.ToHex(), head_style()), MessageTitle(c.Message()));
+        } else {
+            if (count > 1) {
+                fmt::print("\n");
+            }
+
+            print_commit(id, c);
+        }
+
+        return options.count > count;
+    });
+
+    return 0;
+}
+
+} // namespace
+
+int ExecuteLog(int argc, char* argv[], const std::function<Workspace&()>& cb) {
+    Options options;
+
+    {
+        cxxopts::options spec(fmt::format("vcs {}", argv[0]));
+        spec.add_options(
+            "",
+            {
+                {"h,help", "print help"},
+                {"n", "number of commits to output", cxxopts::value<uint64_t>(options.count)},
+                {"oneline", "one commit per line", cxxopts::value<bool>(options.oneline)},
+            }
+        );
+
+        spec.custom_help("[<options>]");
+        spec.positional_help("[[--] <path>]");
+
+        const auto& opts = spec.parse(argc, argv);
+        if (opts.count("help")) {
+            fmt::print("{}\n", spec.help());
+            return 0;
+        }
+
+        options.head = cb().GetCurrentHead();
+    }
+
+    return Execute(options, cb());
+}
+
+} // namespace Vcs

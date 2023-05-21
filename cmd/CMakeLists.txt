@@ -25,5 +25,6 @@ target_sources(vcs PRIVATE
     "actions/branch.cpp"
     "actions/git.cpp"
     "actions/init.cpp"
+    "actions/log.cpp"
     "actions/status.cpp"
 )

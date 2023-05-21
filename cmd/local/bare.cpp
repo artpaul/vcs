@@ -1,6 +1,7 @@
 #include "bare.h"
 #include "worktree.h"
 
+#include <vcs/changes/revwalk.h>
 #include <vcs/store/loose.h>
 
 #include <util/file.h>
@@ -82,6 +83,26 @@ void Repository::ListBranches(const std::function<void(const Branch& branch)>& c
         cb(branch);
         return true;
     });
+}
+
+void Repository::Log(
+    const LogOptions& options, const std::function<bool(const HashId& id, const Commit& commit)>& cb
+) const {
+    if (!cb || options.roots.empty()) {
+        return;
+    }
+
+    RevisionGraph::Walker(RevisionGraph(odb_))
+        .Hide(options.hidden)
+        .Push(options.roots)
+        .SimplifyFirstParent(options.first_parent)
+        .Walk([&](const RevisionGraph::Revision& r) {
+            if (cb(r.Id(), odb_.LoadCommit(r.Id()))) {
+                return WalkAction::Continue;
+            } else {
+                return WalkAction::Stop;
+            }
+        });
 }
 
 Datastore Repository::Objects() {

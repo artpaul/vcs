@@ -29,6 +29,10 @@ auto Workspace::GetCurrentBranch() const -> Branch {
     return Branch();
 }
 
+HashId Workspace::GetCurrentHead() const {
+    return GetCurrentBranch().head;
+}
+
 void Workspace::Status(const StatusOptions& options, const StatusCallback& cb) const {
     working_tree_->Status(options, *GetStage(), cb);
 }

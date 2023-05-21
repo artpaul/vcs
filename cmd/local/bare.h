@@ -5,8 +5,34 @@
 #include <vcs/object/store.h>
 
 #include <filesystem>
+#include <unordered_set>
 
 namespace Vcs {
+
+struct LogOptions {
+    std::unordered_set<HashId> roots;
+    std::unordered_set<HashId> hidden;
+    bool first_parent = false;
+
+    LogOptions& Hide(const HashId& commit_id) {
+        if (commit_id) {
+            hidden.insert(commit_id);
+        }
+        return *this;
+    }
+
+    LogOptions& Push(const HashId& commit_id) {
+        if (commit_id) {
+            roots.insert(commit_id);
+        }
+        return *this;
+    }
+
+    LogOptions& SetFirstParent(const bool value) {
+        first_parent = value;
+        return *this;
+    }
+};
 
 class Repository {
 public:
@@ -62,6 +88,18 @@ public:
      * Lists local branches.
      */
     void ListBranches(const std::function<void(const Branch& branch)>& cb) const;
+
+    /**@}*/
+
+public:
+    /**
+     * @name History
+     * @{
+     */
+
+    void Log(
+        const LogOptions& options, const std::function<bool(const HashId& id, const Commit& commit)>& cb
+    ) const;
 
     /**@}*/
 

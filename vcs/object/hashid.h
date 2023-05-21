@@ -116,7 +116,7 @@ template <>
 struct fmt::formatter<Vcs::HashId> : fmt::formatter<std::string> {
     template <typename FormatContext>
     auto format(const Vcs::HashId& id, FormatContext& ctx) {
-        return formatter<std::string>::format(id.ToHex(), ctx);
+        return fmt::formatter<std::string>::format(id.ToHex(), ctx);
     }
 };
 

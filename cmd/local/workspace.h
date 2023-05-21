@@ -31,6 +31,9 @@ public:
      */
     Branch GetCurrentBranch() const;
 
+    /** */
+    HashId GetCurrentHead() const;
+
     /**@}*/
 
 public:
