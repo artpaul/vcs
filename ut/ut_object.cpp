@@ -207,3 +207,44 @@ TEST(RangeIterator, RandomAccessIterator) {
 
 #undef TEST_SEMANTIC
 }
+
+TEST(RangeIterator, Throw) {
+    struct Throw {
+        static HashId Item(const void*, size_t) noexcept(false) {
+            return HashId();
+        }
+        static size_t Size(const void*) {
+            return 0;
+        }
+    };
+
+    static_assert(!RepeatedField<HashId, Throw>::is_noexcept_item);
+    static_assert(!RepeatedField<HashId, Throw>::is_noexcept_size);
+    static_assert(!noexcept(std::declval<RepeatedField<HashId, Throw>>().empty()));
+    static_assert(!noexcept(std::declval<RepeatedField<HashId, Throw>>()[0]));
+}
+
+TEST(RangeIterator, NoThrow) {
+    struct S {
+        constexpr size_t Size() const noexcept {
+            return 3;
+        }
+    };
+
+    struct NoThrow {
+        static constexpr HashId Item(const S*, size_t) noexcept(true) {
+            return HashId();
+        }
+        static constexpr size_t Size(const S* p) noexcept {
+            return p->Size();
+        }
+    };
+
+    S s;
+
+    static_assert(RepeatedField<HashId, NoThrow, S>(&s).size() == 3);
+
+    static_assert(RepeatedField<HashId, NoThrow, S>::is_noexcept_item);
+    static_assert(RepeatedField<HashId, NoThrow, S>::is_noexcept_size);
+    static_assert(noexcept(std::declval<RepeatedField<HashId, NoThrow, S>>()[0]));
+}

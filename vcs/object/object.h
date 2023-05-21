@@ -56,9 +56,15 @@ protected:
     std::shared_ptr<std::byte[]> data_;
 };
 
-template <typename T, typename A>
+template <typename T, typename A, typename P = void>
 class RepeatedField {
 public:
+    static constexpr bool is_noexcept_item =
+        std::is_nothrow_invocable_v<decltype(&A::Item), const P*, size_t>;
+
+    static constexpr bool is_noexcept_size =
+        std::is_nothrow_invocable_v<decltype(&A::Size), const P*>;
+
     class iterator {
     public:
         using iterator_category = std::random_access_iterator_tag;
@@ -67,17 +73,17 @@ public:
         using pointer = const T*;
         using reference = const T&;
 
-        constexpr iterator(const void* p, size_t i) noexcept
+        constexpr iterator(const P* p, size_t i) noexcept
             : p_(p)
             , i_(i) {
         }
 
-        const T operator*() const {
+        constexpr T operator*() const noexcept(is_noexcept_item) {
             assert(i_ < A::Size(p_));
             return A::Item(p_, i_);
         }
 
-        const T operator[](const size_t n) const {
+        constexpr T operator[](const size_t n) const noexcept(is_noexcept_item) {
             assert(i_ + n < A::Size(p_));
             return A::Item(p_, i_ + n);
         }
@@ -137,12 +143,12 @@ public:
         }
 
     private:
-        const void* const p_;
+        const P* const p_;
         size_t i_;
     };
 
 public:
-    constexpr RepeatedField(const void* p) noexcept
+    constexpr RepeatedField(const P* p) noexcept
         : p_(p) {
     }
 
@@ -150,30 +156,30 @@ public:
         return iterator(p_, 0);
     }
 
-    constexpr iterator end() const {
+    constexpr iterator end() const noexcept(is_noexcept_size) {
         return iterator(p_, size());
     }
 
-    bool empty() const {
+    constexpr bool empty() const noexcept(is_noexcept_size) {
         return size() == 0;
     }
 
-    size_t size() const {
+    constexpr size_t size() const noexcept(is_noexcept_size) {
         return p_ ? A::Size(p_) : 0;
     }
 
-    T operator[](const size_t i) const {
+    constexpr T operator[](const size_t i) const noexcept(is_noexcept_item) {
         assert(p_);
         assert(i < size());
         return A::Item(p_, i);
     }
 
-    explicit operator bool() const {
+    explicit constexpr operator bool() const noexcept(is_noexcept_size) {
         return !empty();
     }
 
 private:
-    const void* const p_;
+    const P* const p_;
 };
 
 /**
