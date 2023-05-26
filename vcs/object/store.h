@@ -3,6 +3,8 @@
 #include "hashid.h"
 #include "object.h"
 
+#include <util/stream.h>
+
 namespace Vcs {
 
 /**
@@ -144,8 +146,19 @@ public:
 
     /**
      * Puts an object into the datastore.
+     *
+     * @param type type of data object.
+     * @param content raw content of data object.
      */
     HashId Put(const DataType type, const std::string_view content);
+
+    /**
+     * Puts an object into the datastore.
+     *
+     * @param meta type and size of data object.
+     * @param input input stream which provides content of data object.
+     */
+    HashId Put(const DataHeader meta, InputStream input);
 
     /**@}*/
 
@@ -155,7 +168,6 @@ private:
 private:
     class Impl;
 
-    size_t chunk_size_;
     std::shared_ptr<Impl> impl_;
 };
 

@@ -28,16 +28,21 @@ Object ConstructObjectFromIndex(const Index& index, const Datastore* odb) {
 
 class Datastore::Impl {
 public:
-    constexpr Impl() noexcept
-        : cache_(false) {
+    Impl(const size_t chunk_size) noexcept
+        : chunk_size_(chunk_size)
+        , cache_(false) {
     }
 
     Impl(std::shared_ptr<Impl> other, std::shared_ptr<Backend> backend, bool cache) noexcept
         : backend_(std::move(backend))
         , upsteram_(std::move(other))
+        , chunk_size_(upsteram_->chunk_size_)
         , cache_(cache) {
         assert(backend_);
-        assert(upsteram_);
+    }
+
+    size_t ChunkSize() const noexcept {
+        return chunk_size_;
     }
 
     DataHeader GetMeta(const HashId& id) const {
@@ -86,6 +91,11 @@ public:
     }
 
     void Put(const HashId& id, const DataType type, const std::string_view content) {
+        if (chunk_size_ < content.size()) {
+            throw std::runtime_error(
+                fmt::format("content size {} exceeds size of chunk {}", content.size(), chunk_size_)
+            );
+        }
         if (backend_) {
             backend_->Put(id, type, content);
         }
@@ -94,21 +104,28 @@ public:
         }
     }
 
+    HashId Put(const DataType type, const std::string_view content) {
+        HashId id = HashId::Make(type, content);
+
+        Put(id, type, content);
+
+        return id;
+    }
+
 private:
     std::shared_ptr<Backend> backend_;
     std::shared_ptr<Impl> upsteram_;
+    size_t chunk_size_;
     /// Put objects received from upstream into local backend.
     bool cache_;
 };
 
 Datastore::Datastore(const size_t chunk_size)
-    : chunk_size_(chunk_size)
-    , impl_(std::make_shared<Impl>()) {
+    : impl_(std::make_shared<Impl>(chunk_size)) {
 }
 
 Datastore::Datastore(const Datastore& other, std::shared_ptr<Backend> backend, bool cache)
-    : chunk_size_(other.chunk_size_)
-    , impl_(std::make_shared<Impl>(other.impl_, std::move(backend), cache)) {
+    : impl_(std::make_shared<Impl>(other.impl_, std::move(backend), cache)) {
 }
 
 Datastore::~Datastore() = default;
@@ -185,34 +202,69 @@ Tree Datastore::LoadTree(const HashId& id) const {
 }
 
 HashId Datastore::Put(const DataType type, const std::string_view content) {
-    const auto put_single_object = [this](HashId id, const DataType type, const std::string_view content) {
-        id = bool(id) ? id : HashId::Make(type, content);
-
-        impl_->Put(id, type, content);
-
-        return id;
-    };
-
     // The data is small enough to be saved as single object.
-    if (chunk_size_ >= (DataHeader::Make(type, content.size()).Bytes() + content.size())) {
-        return put_single_object(HashId(), type, content);
+    if (impl_->ChunkSize() >= content.size()) {
+        return impl_->Put(type, content);
     }
 
     IndexBuilder builder(HashId::Make(type, content), type);
     // Split content by parts.
     for (size_t offset = 0, end = content.size(); offset != end;) {
-        const size_t size = std::min(chunk_size_, content.size() - offset);
-        const HashId& id = HashId::Make(DataType::Blob, content.substr(offset, size));
-
+        const size_t size = std::min(impl_->ChunkSize(), content.size() - offset);
         // Part of the content is saved as a blob object.
-        put_single_object(id, DataType::Blob, content.substr(offset, size));
+        const HashId id = impl_->Put(DataType::Blob, content.substr(offset, size));
         // Save part.
         builder.Append(id, size);
 
         offset += size;
     }
 
-    return put_single_object(HashId(), DataType::Index, builder.Serialize());
+    // Save index.
+    return impl_->Put(DataType::Index, builder.Serialize());
+}
+
+HashId Datastore::Put(const DataHeader meta, InputStream input) {
+    const auto put_single_object =
+        [this](const DataHeader meta, InputStream& input, HashId::Builder* hasher) {
+            auto buf = std::make_unique_for_overwrite<char[]>(meta.Size());
+            auto content = std::string_view(buf.get(), meta.Size());
+
+            // Load content of the object into the temporary buffer.
+            if (const size_t read = input.Load(buf.get(), content.size()); read != content.size()) {
+                throw std::runtime_error(fmt::format(
+                    "unexpected end of stream: expected is {} but actual is {}", content.size(), read
+                ));
+            }
+            // Append data to the hasher.
+            if (hasher) {
+                hasher->Append(content);
+            }
+            // Store object.
+            return impl_->Put(meta.Type(), content);
+        };
+
+    // The data is small enough to be saved as single object.
+    if (impl_->ChunkSize() >= meta.Size()) {
+        return put_single_object(meta, input, nullptr);
+    }
+
+    HashId::Builder hasher;
+    IndexBuilder index(HashId(), meta.Type());
+    // Split content by parts.
+    for (size_t offset = 0, end = meta.Size(); offset != end;) {
+        const size_t size = std::min(impl_->ChunkSize(), meta.Size() - offset);
+        // Part of the content is saved as a blob object.
+        const HashId id = put_single_object(DataHeader::Make(DataType::Blob, size), input, &hasher);
+        // Save part.
+        index.Append(id, size);
+
+        offset += size;
+    }
+    // Set id of the whole object.
+    index.SetId(hasher.Build());
+
+    // Save index.
+    return impl_->Put(DataType::Index, index.Serialize());
 }
 
 } // namespace Vcs

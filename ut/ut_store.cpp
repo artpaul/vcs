@@ -7,7 +7,33 @@
 
 using namespace Vcs;
 
+namespace {
+
 static constexpr std::string_view text("one line of text");
+
+class StringInput {
+public:
+    explicit StringInput(const std::string& data)
+        : data_(data)
+        , pos_(0) {
+    }
+
+    size_t Read(void* buf, size_t len) {
+        if (pos_ < data_.size()) {
+            len = std::min(len, data_.size() - pos_);
+            std::memcpy(buf, data_.data(), len);
+            pos_ += len;
+            return len;
+        }
+        return 0;
+    }
+
+private:
+    const std::string& data_;
+    size_t pos_{0};
+};
+
+} // namespace
 
 TEST(Datastore, Cache) {
     auto mem1 = Store::MemoryCache::Make(1024);
@@ -27,6 +53,27 @@ TEST(Datastore, Cache) {
     EXPECT_TRUE(Datastore().Chain(mem3).IsExists(id));
     // Blob should not exist in the second backend.
     EXPECT_FALSE(Datastore().Chain(mem2).IsExists(id));
+}
+
+TEST(Datastore, InputStream) {
+    auto mem = Store::MemoryCache::Make(1024);
+    auto odb = Datastore(256).Chain(mem);
+    auto data = std::string();
+    auto stream = StringInput(data);
+
+    for (size_t i = 0; i < 20; ++i) {
+        data.append(text);
+    }
+
+    auto id = odb.Put(DataHeader::Make(DataType::Blob, data.size()), InputStream(stream));
+
+    ASSERT_TRUE(id);
+    // Check validity of metadata.
+    EXPECT_EQ(odb.GetType(id), DataType::Index);
+    EXPECT_EQ(odb.GetType(id, true), DataType::Blob);
+    EXPECT_EQ(odb.GetMeta(id, true).Size(), data.size());
+    // Check equality of content.
+    EXPECT_EQ(std::string_view(odb.LoadBlob(id)), data);
 }
 
 TEST(MemoryCache, Capacity) {
@@ -100,7 +147,7 @@ TEST(MemoryCache, BlobChunked) {
     }
 
     {
-        auto mem = Datastore(512).Chain<Store::MemoryCache>(1u << 20);
+        auto mem = Datastore(1024).Chain<Store::MemoryCache>(1u << 20);
         const auto id = mem.Put(DataType::Blob, content);
 
         ASSERT_TRUE(mem.IsExists(id));
@@ -121,7 +168,7 @@ TEST(MemoryCache, TreeChunked) {
         );
     }
 
-    auto mem = Datastore(512).Chain<Store::MemoryCache>(1u << 20);
+    auto mem = Datastore(1024).Chain<Store::MemoryCache>(1u << 20);
     const auto id = mem.Put(DataType::Tree, builder.Serialize());
 
     ASSERT_TRUE(mem.IsExists(id));
