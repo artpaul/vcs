@@ -1,5 +1,6 @@
 #pragma once
 
+#include <vcs/changes/path.h>
 #include <vcs/object/path.h>
 
 #include <functional>
@@ -59,9 +60,16 @@ struct StatusOptions {
     bool tracked = true;
     /// Emit untracked items.
     Expansion untracked = Expansion::Normal;
+    /// Paths to include.
+    const PathFilter* include = nullptr;
 
     StatusOptions& SetIgnored(Expansion value) {
         ignored = value;
+        return *this;
+    }
+
+    StatusOptions& SetInclude(const PathFilter* value) {
+        include = value;
         return *this;
     }
 

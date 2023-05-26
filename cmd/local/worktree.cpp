@@ -159,10 +159,21 @@ void WorkingTree::Status(const StatusOptions& options, const StageArea& stage, c
 
     state.emplace(std::string(), stage.ListTree(std::string()));
 
+    const auto is_not_match = [&](const auto& path) {
+        return options.include && !options.include->Match(path);
+    };
+
+    const auto is_not_parent = [&](const auto& path) {
+        return options.include && !options.include->IsParent(path);
+    };
+
     const auto emit_deleted = [&](const size_t depth) {
         while (state.size() > depth) {
             if (options.tracked) {
                 state.top().EnumerateDeleted([&](const std::string& path, const PathEntry& entry) {
+                    if (is_not_match(path)) {
+                        return;
+                    }
                     cb(PathStatus().SetPath(path).SetStatus(PathStatus::Deleted).SetType(entry.type));
                 });
             }
@@ -187,6 +198,12 @@ void WorkingTree::Status(const StatusOptions& options, const StageArea& stage, c
         }
 
         if (entry.is_directory()) {
+            // Skip subtree if it does not match the filter.
+            if (is_not_parent(path)) {
+                di.disable_recursion_pending();
+                continue;
+            }
+
             if (const auto ei = state.top().Find(filename)) {
                 if (IsDirectory(ei->type)) {
                     // Emplace entries on entering a directory.
@@ -209,6 +226,10 @@ void WorkingTree::Status(const StatusOptions& options, const StageArea& stage, c
             }
         } else if (entry.is_regular_file() || entry.is_symlink()) {
             const auto path_type = entry.is_regular_file() ? PathType::File : PathType::Symlink;
+
+            if (is_not_match(path)) {
+                return;
+            }
 
             if (const auto ei = state.top().Find(filename)) {
                 if (IsDirectory(ei->type)) {

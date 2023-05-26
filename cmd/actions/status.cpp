@@ -12,7 +12,10 @@
 namespace Vcs {
 namespace {
 
-struct Options { };
+struct Options {
+    /// Paths to include in status.
+    PathFilter paths;
+};
 
 void BranchInfo(const Options&, const Workspace& repo) {
     const auto& branch = repo.GetCurrentBranch();
@@ -26,11 +29,11 @@ void BranchInfo(const Options&, const Workspace& repo) {
     );
 }
 
-void ChangesInfo(const Options&, const Workspace& repo) {
+void ChangesInfo(const Options& options, const Workspace& repo) {
     std::vector<PathStatus> tracked;
     std::vector<PathStatus> untracked;
 
-    repo.Status(StatusOptions(), [&](const PathStatus& status) {
+    repo.Status(StatusOptions().SetInclude(&options.paths), [&](const PathStatus& status) {
         if (status.status == PathStatus::Deleted || status.status == PathStatus::Modified) {
             tracked.push_back(status);
         }
@@ -123,6 +126,15 @@ int ExecuteStatus(int argc, char* argv[], const std::function<Workspace&()>& cb)
         if (opts.count("help")) {
             fmt::print("{}\n", spec.help());
             return 0;
+        }
+        if (opts.has("paths")) {
+            const auto& paths = opts["paths"].as<std::vector<std::string>>();
+            // const auto& repo = cb();
+
+            for (const auto& path : paths) {
+                options.paths.Append(path);
+                // options.paths.Append(repo.ToTreePath(path));
+            }
         }
     }
 
