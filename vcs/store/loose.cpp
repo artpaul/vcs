@@ -178,11 +178,11 @@ Object Loose::Load(const HashId& id, const DataType expected) const try
                 break;
             }
             case Compression::Lz4: {
-                std::vector<char> comp(hdr.stored);
+                auto comp = std::make_unique_for_overwrite<char[]>(hdr.stored);
 
-                read_to_buffer(reinterpret_cast<std::byte*>(comp.data()), comp.size());
+                read_to_buffer(reinterpret_cast<std::byte*>(comp.get()), hdr.stored);
 
-                const int ret = ::LZ4_decompress_safe(comp.data(), (char*)buf, comp.size(), buf_len);
+                const int ret = ::LZ4_decompress_safe(comp.get(), (char*)buf, hdr.stored, buf_len);
                 if (ret != int(buf_len)) {
                     throw std::runtime_error(fmt::format("cannot decompres content '{}'", ret));
                 }
@@ -228,15 +228,16 @@ void Loose::Put(const HashId& id, const DataType type, const std::string_view co
             break;
         }
         case Compression::Lz4: {
-            std::vector<char> buf(::LZ4_compressBound(content.size()));
+            auto buf_size = ::LZ4_compressBound(content.size());
+            auto buf = std::make_unique_for_overwrite<char[]>(buf_size);
 
-            int len = ::LZ4_compress_default(content.data(), buf.data(), content.size(), buf.size());
+            int len = ::LZ4_compress_default(content.data(), buf.get(), content.size(), buf_size);
 
             if (len == 0) {
                 throw std::runtime_error("cannot compress data");
             }
 
-            write_to_file(buf.data(), len);
+            write_to_file(buf.get(), len);
             break;
         }
     }

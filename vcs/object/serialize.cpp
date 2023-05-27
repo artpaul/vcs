@@ -44,13 +44,13 @@ std::string CommitBuilder::Serialize() {
         const size_t size = this->parents[0].Size();
         std::vector<uint8_t> data(this->parents.size() * size);
         for (size_t i = 0; i < this->parents.size(); ++i) {
-            memcpy(data.data() + i * size, this->parents[i].Data(), size);
+            std::memcpy(data.data() + i * size, this->parents[i].Data(), size);
         }
         parents = fbb.CreateVector(data);
     }
     if (!this->attributes.empty()) {
         // Sort by name.
-        sort(this->attributes.begin(), this->attributes.end(), [](const auto& a, const auto& b) {
+        std::sort(this->attributes.begin(), this->attributes.end(), [](const auto& a, const auto& b) {
             return a.name < b.name;
         });
 
