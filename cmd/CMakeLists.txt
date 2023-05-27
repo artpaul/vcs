@@ -23,6 +23,7 @@ target_sources(vcs PRIVATE
     "main.cpp"
     "actions.cpp"
     "actions/branch.cpp"
+    "actions/commit.cpp"
     "actions/git.cpp"
     "actions/init.cpp"
     "actions/log.cpp"

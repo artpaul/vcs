@@ -2,10 +2,14 @@
 #include "worktree.h"
 
 #include <vcs/changes/stage.h>
+#include <vcs/object/commit.h>
+#include <vcs/object/serialize.h>
 
 #include <util/file.h>
 
 #include <contrib/fmt/fmt/std.h>
+
+#include <chrono>
 
 namespace Vcs {
 
@@ -33,31 +37,55 @@ HashId Workspace::GetCurrentHead() const {
     return GetCurrentBranch().head;
 }
 
-void Workspace::Status(const StatusOptions& options, const StatusCallback& cb) const {
-    working_tree_->Status(options, *GetStage(), cb);
+HashId Workspace::Commit(const std::string& message, const std::vector<PathStatus>& changes) {
+    auto branch = GetCurrentBranch();
+    auto stage = GetStage();
+
+    for (const auto& change : changes) {
+        if (change.status == PathStatus::Deleted) {
+            stage.Remove(change.path);
+        } else {
+            if (auto blob = working_tree_->MakeBlob(change.path, odb_)) {
+                stage.Add(change.path, *blob);
+            } else {
+                throw std::runtime_error(fmt::format("cannot make blob from '{}'", change.path));
+            }
+        }
+    }
+
+    const auto now = std::chrono::system_clock::now();
+    CommitBuilder builder;
+    builder.message = message;
+    builder.tree = stage.SaveTree(odb_);
+    // Author.
+    builder.author.when = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
+    // Committer.
+    builder.committer = builder.author;
+    // Parents.
+    if (branch.head) {
+        builder.parents.push_back(branch.head);
+    }
+    // Generation number.
+    builder.generation = 1 + GetLargestGeneration(builder, odb_);
+
+    // Store commit object.
+    const HashId id = odb_.Put(DataType::Commit, builder.Serialize());
+
+    // Update head of the branch.
+    branch.head = id;
+    branches_->Put(branch.name, branch);
+
+    return id;
 }
 
-StageArea* Workspace::GetStage() const {
-    if (stage_) {
-        return stage_.get();
-    }
+void Workspace::Status(const StatusOptions& options, const StatusCallback& cb) const {
+    working_tree_->Status(options, GetStage(), cb);
+}
 
-    // if (std::filesystem::exists(state_path_ / "stage"))
-    //{
-    //  TODO: load from file
-    //} else
-    {
-        const auto& branch = GetCurrentBranch();
-        HashId tree_id;
+StageArea Workspace::GetStage() const {
+    const auto branch = GetCurrentBranch();
 
-        if (branch.head) {
-            tree_id = odb_.LoadCommit(branch.head).Tree();
-        }
-
-        stage_ = std::make_unique<StageArea>(odb_, tree_id);
-    }
-
-    return stage_.get();
+    return StageArea(odb_, branch.head ? odb_.LoadCommit(branch.head).Tree() : HashId());
 }
 
 } // namespace Vcs

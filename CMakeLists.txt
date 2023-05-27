@@ -13,6 +13,8 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 if("${CMAKE_BUILD_TYPE}" STREQUAL "")
     set(CMAKE_BUILD_TYPE "Debug")
 endif()
@@ -32,6 +34,6 @@ if(BUILD_TESTS)
 
     # Local test projects.
     if(IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/junk")
-        add_subdirectory(junk)
+        add_subdirectory(junk EXCLUDE_FROM_ALL)
     endif()
 endif()

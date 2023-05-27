@@ -1,4 +1,5 @@
 #include <cmd/local/workspace.h>
+#include <vcs/object/commit.h>
 
 #include <util/tty.h>
 
@@ -19,41 +20,6 @@ struct Options {
     /// Use only one line for each log entry.
     bool oneline = false;
 };
-
-std::string_view MessageTitle(const std::string_view msg) noexcept {
-    auto pos = msg.find('\n');
-    if (pos == std::string_view::npos) {
-        return msg;
-    } else {
-        return msg.substr(0, pos);
-    }
-}
-
-std::vector<std::string_view> MessageLines(const std::string_view msg) {
-    std::vector<std::string_view> lines;
-
-    for (size_t i = 0, end = msg.size(); i < end;) {
-        while (i < end && std::isspace(msg[i])) {
-            ++i;
-        }
-
-        size_t l = i;
-        while (i < msg.size() && msg[i] != '\n') {
-            ++i;
-        }
-        size_t r = i - 1;
-        while (l < r) {
-            if (std::isspace(msg[r])) {
-                --r;
-            } else {
-                lines.push_back(msg.substr(l, r - l + 1));
-                break;
-            }
-        }
-    }
-
-    return lines;
-}
 
 int Execute(const Options& options, const Workspace& repo) {
     uint64_t count = 0u;
@@ -84,7 +50,7 @@ int Execute(const Options& options, const Workspace& repo) {
             c.Author().Id().empty() ? "" : fmt::format(" <{}>", c.Author().Id())
         );
         // Date.
-        fmt::print("Date:   {}\n", date_string(c.Timestamp() / 1'000'000));
+        fmt::print("Date:   {}\n", date_string(c.Timestamp()));
         // Message.
         if (const auto& lines = MessageLines(c.Message()); !lines.empty()) {
             fmt::print("\n");

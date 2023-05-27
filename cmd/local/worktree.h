@@ -18,6 +18,9 @@ public:
 
     WorkingTree(const std::filesystem::path& path, const Datastore odb);
 
+    /** Save file to a blob. */
+    std::optional<PathEntry> MakeBlob(const std::string& path, Datastore odb) const;
+
 public:
     /** Checkout a tree into the working directory. */
     void Checkout(const HashId& tree_id);

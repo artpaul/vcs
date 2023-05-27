@@ -1,5 +1,7 @@
 #include "worktree.h"
 
+#include <vcs/object/serialize.h>
+
 #include <util/file.h>
 
 #include <contrib/fmt/fmt/std.h>
@@ -69,6 +71,36 @@ private:
 WorkingTree::WorkingTree(const std::filesystem::path& path, Datastore odb)
     : path_(path)
     , odb_(std::move(odb)) {
+}
+
+std::optional<PathEntry> WorkingTree::MakeBlob(const std::string& path, Datastore odb) const {
+    const auto file_path = path_ / path;
+
+    switch (std::filesystem::symlink_status(file_path).type()) {
+        case std::filesystem::file_type::regular: {
+            auto f = File::ForRead(file_path, false);
+            auto size = f.Size();
+
+            return PathEntry{
+                .id = odb.Put(DataHeader::Make(DataType::Blob, size), InputStream(f)),
+                .type = PathType::File,
+                .size = size,
+            };
+        }
+        case std::filesystem::file_type::symlink: {
+            const std::string link = std::filesystem::read_symlink(file_path);
+
+            return PathEntry{
+                .id = odb.Put(DataType::Blob, link),
+                .type = PathType::Symlink,
+                .size = link.size(),
+            };
+        }
+        default:
+            break;
+    }
+
+    return std::nullopt;
 }
 
 void WorkingTree::Checkout(const HashId& tree_id) {

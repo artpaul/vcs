@@ -19,4 +19,39 @@ uint64_t GetLargestGeneration(const CommitBuilder& builder, const Datastore& odb
     return generation;
 }
 
+std::vector<std::string_view> MessageLines(const std::string_view msg) {
+    std::vector<std::string_view> lines;
+
+    for (size_t i = 0, end = msg.size(); i < end;) {
+        while (i < end && std::isspace(msg[i])) {
+            ++i;
+        }
+
+        size_t l = i;
+        while (i < msg.size() && msg[i] != '\n') {
+            ++i;
+        }
+        size_t r = i - 1;
+        while (l < r) {
+            if (std::isspace(msg[r])) {
+                --r;
+            } else {
+                lines.push_back(msg.substr(l, r - l + 1));
+                break;
+            }
+        }
+    }
+
+    return lines;
+}
+
+std::string_view MessageTitle(const std::string_view msg) noexcept {
+    auto pos = msg.find('\n');
+    if (pos == std::string_view::npos) {
+        return msg;
+    } else {
+        return msg.substr(0, pos);
+    }
+}
+
 } // namespace Vcs

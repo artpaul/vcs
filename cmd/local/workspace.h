@@ -45,13 +45,16 @@ public:
     /** Remove untracked files from the working tree. */
     void Cleanup();
 
+    /** */
+    HashId Commit(const std::string& message, const std::vector<PathStatus>& changes);
+
     /** Emits status of changed items in the working tree. */
     void Status(const StatusOptions& options, const StatusCallback& cb) const;
 
     /**@}*/
 
 private:
-    StageArea* GetStage() const;
+    StageArea GetStage() const;
 
 private:
     std::filesystem::path state_path_;
