@@ -14,9 +14,10 @@ namespace Vcs {
  */
 class WorkingTree {
 public:
-    class Handlers { };
-
     WorkingTree(const std::filesystem::path& path, const Datastore odb);
+
+    /** Root path of the tree. */
+    const std::filesystem::path& GetPath() const;
 
     /** Save file to a blob. */
     std::optional<PathEntry> MakeBlob(const std::string& path, Datastore odb) const;

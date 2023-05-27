@@ -37,6 +37,19 @@ HashId Workspace::GetCurrentHead() const {
     return GetCurrentBranch().head;
 }
 
+std::optional<HashId> Workspace::ResolveReference(const std::string_view ref) const {
+    if (HashId::IsHex(ref)) {
+        return HashId::FromHex(ref);
+    }
+    if (const auto& branch = branches_->Get(ref)) {
+        return branch->head;
+    }
+    if (ref == "HEAD") {
+        return GetCurrentHead();
+    }
+    return std::nullopt;
+}
+
 HashId Workspace::Commit(const std::string& message, const std::vector<PathStatus>& changes) {
     auto branch = GetCurrentBranch();
     auto stage = GetStage();
@@ -82,10 +95,17 @@ void Workspace::Status(const StatusOptions& options, const StatusCallback& cb) c
     working_tree_->Status(options, GetStage(), cb);
 }
 
-StageArea Workspace::GetStage() const {
-    const auto branch = GetCurrentBranch();
+std::string Workspace::ToTreePath(const std::filesystem::path& path) const {
+    if (path.is_relative()) {
+        return (std::filesystem::current_path() / path).lexically_relative(working_tree_->GetPath());
+    }
+    return path.lexically_relative(working_tree_->GetPath());
+}
 
-    return StageArea(odb_, branch.head ? odb_.LoadCommit(branch.head).Tree() : HashId());
+StageArea Workspace::GetStage() const {
+    const auto head = GetCurrentHead();
+
+    return StageArea(odb_, head ? odb_.LoadCommit(head).Tree() : HashId());
 }
 
 } // namespace Vcs

@@ -34,6 +34,8 @@ public:
     /** */
     HashId GetCurrentHead() const;
 
+    std::optional<HashId> ResolveReference(const std::string_view ref) const;
+
     /**@}*/
 
 public:
@@ -50,6 +52,9 @@ public:
 
     /** Emits status of changed items in the working tree. */
     void Status(const StatusOptions& options, const StatusCallback& cb) const;
+
+    /** Converts filesystem path to a path relative the working tree. */
+    std::string ToTreePath(const std::filesystem::path& path) const;
 
     /**@}*/
 

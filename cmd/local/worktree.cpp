@@ -73,6 +73,10 @@ WorkingTree::WorkingTree(const std::filesystem::path& path, Datastore odb)
     , odb_(std::move(odb)) {
 }
 
+const std::filesystem::path& WorkingTree::GetPath() const {
+    return path_;
+}
+
 std::optional<PathEntry> WorkingTree::MakeBlob(const std::string& path, Datastore odb) const {
     const auto file_path = path_ / path;
 
