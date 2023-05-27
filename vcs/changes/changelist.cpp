@@ -2,6 +2,7 @@
 #include "stage.h"
 
 #include <vcs/object/serialize.h>
+#include <vcs/object/store.h>
 
 namespace Vcs {
 namespace {

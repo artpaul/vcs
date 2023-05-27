@@ -14,7 +14,7 @@ namespace Vcs {
 namespace {
 
 struct Options {
-    HashId head;
+    HashId head{};
     /// Maximum number of commits to output.
     uint64_t count = std::numeric_limits<uint64_t>::max();
     /// Use only one line for each log entry.
@@ -92,19 +92,31 @@ int ExecuteLog(int argc, char* argv[], const std::function<Workspace&()>& cb) {
                 {"h,help", "print help"},
                 {"n", "number of commits to output", cxxopts::value<uint64_t>(options.count)},
                 {"oneline", "one commit per line", cxxopts::value<bool>(options.oneline)},
+                {"args", "free args", cxxopts::value<std::vector<std::string>>()},
             }
         );
 
+        spec.parse_positional("args");
         spec.custom_help("[<options>]");
-        spec.positional_help("[[--] <path>]");
+        spec.positional_help("[<revision>] [[--] <path>]");
 
         const auto& opts = spec.parse(argc, argv);
         if (opts.count("help")) {
             fmt::print("{}\n", spec.help());
             return 0;
         }
+        if (opts.has("args")) {
+            const auto& args = opts["args"].as<std::vector<std::string>>();
+            const auto& repo = cb();
 
-        options.head = cb().GetCurrentHead();
+            if (const auto id = repo.ResolveReference(args[0])) {
+                options.head = *id;
+            }
+        }
+
+        if (!bool(options.head)) {
+            options.head = cb().GetCurrentHead();
+        }
     }
 
     return Execute(options, cb());

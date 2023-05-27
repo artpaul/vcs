@@ -13,6 +13,7 @@ extern int ExecuteDump(int argc, char* argv[], const std::function<Workspace&()>
 extern int ExecuteGit(int argc, char* argv[]);
 extern int ExecuteInit(int argc, char* argv[]);
 extern int ExecuteLog(int argc, char* argv[], const std::function<Workspace&()>& cb);
+extern int ExecuteShow(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteStatus(int argc, char* argv[], const std::function<Workspace&()>& cb);
 
 static int Main(int argc, char* argv[]) {
@@ -85,7 +86,7 @@ static int Main(int argc, char* argv[]) {
         case Action::Restore:
             break;
         case Action::Show:
-            break;
+            return ExecuteShow(argc - 1, argv + 1, get_workspace);
         case Action::Status:
             return ExecuteStatus(argc - 1, argv + 1, get_workspace);
         case Action::Switch:

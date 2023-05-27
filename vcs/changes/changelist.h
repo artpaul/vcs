@@ -4,7 +4,6 @@
 
 #include <vcs/object/object.h>
 #include <vcs/object/path.h>
-#include <vcs/object/store.h>
 
 #include <functional>
 #include <vector>
