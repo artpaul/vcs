@@ -11,6 +11,7 @@
 namespace Vcs {
 
 class Datastore;
+class PathFilter;
 
 class ChangelistBuilder {
 public:
@@ -19,7 +20,9 @@ public:
 
     void Changes(const HashId& from, const HashId& to);
 
-    ChangelistBuilder& SetExpandDirectories(bool value);
+    ChangelistBuilder& SetExpandDirectories(bool value) noexcept;
+
+    ChangelistBuilder& SetInclude(const PathFilter* value) noexcept;
 
 private:
     void EmitAdd(const std::string& path, const PathType type);
@@ -42,6 +45,7 @@ private:
 private:
     const Datastore& odb_;
     std::function<void(Change)> cb_;
+    const PathFilter* filter_ = nullptr;
     /// Expand content created or deleted directories.
     bool expand_directories_ = true;
 };

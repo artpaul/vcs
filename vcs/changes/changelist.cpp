@@ -1,4 +1,5 @@
 #include "changelist.h"
+#include "path.h"
 #include "stage.h"
 
 #include <vcs/object/serialize.h>
@@ -30,7 +31,15 @@ Tree GetRoot(const HashId& id, const Datastore& odb) {
     }
 }
 
-static std::string JoinPath(std::string path, const std::string_view name) {
+bool IsIncluded(const PathFilter* filter, const std::string_view path) {
+    return !filter || filter->Match(path);
+}
+
+bool IsParent(const PathFilter* filter, const std::string_view path) {
+    return !filter || filter->IsParent(path);
+}
+
+std::string JoinPath(std::string path, const std::string_view name) {
     if (path.empty()) {
         return std::string(name);
     } else {
@@ -53,8 +62,13 @@ ChangelistBuilder::ChangelistBuilder(const Datastore& odb, std::vector<Change>& 
     , cb_([&changes](Change change) { changes.push_back(std::move(change)); }) {
 }
 
-ChangelistBuilder& ChangelistBuilder::SetExpandDirectories(bool value) {
+ChangelistBuilder& ChangelistBuilder::SetExpandDirectories(bool value) noexcept {
     expand_directories_ = value;
+    return *this;
+}
+
+ChangelistBuilder& ChangelistBuilder::SetInclude(const PathFilter* value) noexcept {
+    filter_ = value;
     return *this;
 }
 
@@ -67,42 +81,48 @@ void ChangelistBuilder::Changes(const HashId& from, const HashId& to) {
 }
 
 void ChangelistBuilder::EmitAdd(const std::string& path, const PathType type) {
-    Change change;
+    if (IsIncluded(filter_, path)) {
+        Change change;
 
-    change.action = PathAction::Add;
-    change.path = path;
-    change.type = type;
+        change.action = PathAction::Add;
+        change.path = path;
+        change.type = type;
 
-    cb_(std::move(change));
+        cb_(std::move(change));
+    }
 }
 
 void ChangelistBuilder::EmitChange(
     const std::string& path, const PathType type, const Modifications flags
 ) {
-    Change change;
+    if (IsIncluded(filter_, path)) {
+        Change change;
 
-    change.action = PathAction::Change;
-    change.flags = flags;
-    change.path = path;
-    change.type = type;
+        change.action = PathAction::Change;
+        change.flags = flags;
+        change.path = path;
+        change.type = type;
 
-    cb_(std::move(change));
+        cb_(std::move(change));
+    }
 }
 
 void ChangelistBuilder::EmitDelete(const std::string& path, const PathType type) {
-    Change change;
+    if (IsIncluded(filter_, path)) {
+        Change change;
 
-    change.action = PathAction::Delete;
-    change.path = path;
-    change.type = type;
+        change.action = PathAction::Delete;
+        change.path = path;
+        change.type = type;
 
-    cb_(std::move(change));
+        cb_(std::move(change));
+    }
 }
 
 void ChangelistBuilder::ProcessAdded(const std::string& path, const Tree::Entry to) {
     EmitAdd(path, to.Type());
 
-    if (IsDirectory(to.Type()) && expand_directories_) {
+    if (IsDirectory(to.Type()) && expand_directories_ && IsParent(filter_, path)) {
         const auto& tree = odb_.LoadTree(to.Id());
 
         for (const auto entry : tree.Entries()) {
@@ -121,7 +141,9 @@ void ChangelistBuilder::ProcessChanged(
         } else if (IsFile(from.Type())) {
             EmitChange(path, from.Type(), flags);
         } else if (IsDirectory(to.Type())) {
-            TreeChanges(path, odb_.LoadTree(from.Id()), odb_.LoadTree(to.Id()));
+            if (IsParent(filter_, path)) {
+                TreeChanges(path, odb_.LoadTree(from.Id()), odb_.LoadTree(to.Id()));
+            }
         } else {
             assert(false);
         }
@@ -131,7 +153,7 @@ void ChangelistBuilder::ProcessChanged(
 void ChangelistBuilder::ProcessDeleted(const std::string& path, const Tree::Entry from) {
     EmitDelete(path, from.Type());
 
-    if (IsDirectory(from.Type()) && expand_directories_) {
+    if (IsDirectory(from.Type()) && expand_directories_ && IsParent(filter_, path)) {
         const auto& tree = odb_.LoadTree(from.Id());
 
         for (const auto entry : tree.Entries()) {

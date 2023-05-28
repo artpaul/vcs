@@ -1,4 +1,5 @@
 #include <vcs/changes/changelist.h>
+#include <vcs/changes/path.h>
 #include <vcs/changes/stage.h>
 #include <vcs/store/memory.h>
 
@@ -32,7 +33,7 @@ static HashId MakeTreeUtil(Datastore odb) {
     return index.SaveTree(odb);
 }
 
-TEST(ChangelistBuilderTest, Changes) {
+TEST(ChangelistBuilder, Changes) {
     auto mem = Datastore::Make<Store::MemoryCache>();
 
     HashId tree_lib = MakeTreeLib(mem);
@@ -43,24 +44,24 @@ TEST(ChangelistBuilderTest, Changes) {
 
     ASSERT_EQ(changes.size(), 5u);
 
-    ASSERT_EQ(changes[0].action, PathAction::Delete);
-    ASSERT_EQ(changes[0].path, "bin");
+    EXPECT_EQ(changes[0].action, PathAction::Delete);
+    EXPECT_EQ(changes[0].path, "bin");
 
-    ASSERT_EQ(changes[1].action, PathAction::Delete);
-    ASSERT_EQ(changes[1].path, "bin/main.cpp");
+    EXPECT_EQ(changes[1].action, PathAction::Delete);
+    EXPECT_EQ(changes[1].path, "bin/main.cpp");
 
-    ASSERT_EQ(changes[2].action, PathAction::Change);
-    ASSERT_EQ(changes[2].path, "lib/test.h");
+    EXPECT_EQ(changes[2].action, PathAction::Change);
+    EXPECT_EQ(changes[2].path, "lib/test.h");
 
-    ASSERT_EQ(changes[3].action, PathAction::Add);
-    ASSERT_EQ(changes[3].type, PathType::Directory);
-    ASSERT_EQ(changes[3].path, "util");
+    EXPECT_EQ(changes[3].action, PathAction::Add);
+    EXPECT_EQ(changes[3].type, PathType::Directory);
+    EXPECT_EQ(changes[3].path, "util");
 
-    ASSERT_EQ(changes[4].action, PathAction::Add);
-    ASSERT_EQ(changes[4].path, "util/string.h");
+    EXPECT_EQ(changes[4].action, PathAction::Add);
+    EXPECT_EQ(changes[4].path, "util/string.h");
 }
 
-TEST(ChangelistBuilderTest, ChangesNoDirectoryExpansion) {
+TEST(ChangelistBuilder, ChangesNoDirectoryExpansion) {
     auto mem = Datastore::Make<Store::MemoryCache>();
 
     HashId tree_lib = MakeTreeLib(mem);
@@ -71,14 +72,39 @@ TEST(ChangelistBuilderTest, ChangesNoDirectoryExpansion) {
 
     ASSERT_EQ(changes.size(), 3u);
 
-    ASSERT_EQ(changes[0].action, PathAction::Delete);
-    ASSERT_EQ(changes[0].type, PathType::Directory);
-    ASSERT_EQ(changes[0].path, "bin");
+    EXPECT_EQ(changes[0].action, PathAction::Delete);
+    EXPECT_EQ(changes[0].type, PathType::Directory);
+    EXPECT_EQ(changes[0].path, "bin");
 
-    ASSERT_EQ(changes[1].action, PathAction::Change);
-    ASSERT_EQ(changes[1].path, "lib/test.h");
+    EXPECT_EQ(changes[1].action, PathAction::Change);
+    EXPECT_EQ(changes[1].path, "lib/test.h");
 
-    ASSERT_EQ(changes[2].action, PathAction::Add);
-    ASSERT_EQ(changes[2].type, PathType::Directory);
-    ASSERT_EQ(changes[2].path, "util");
+    EXPECT_EQ(changes[2].action, PathAction::Add);
+    EXPECT_EQ(changes[2].type, PathType::Directory);
+    EXPECT_EQ(changes[2].path, "util");
+}
+
+TEST(ChangelistBuilder, IncludeFilter) {
+    auto mem = Datastore::Make<Store::MemoryCache>();
+    auto filter = PathFilter({"lib/test.h", "util"});
+
+    const HashId tree_lib = MakeTreeLib(mem);
+    const HashId tree_util = MakeTreeUtil(mem);
+
+    std::vector<Change> changes;
+    ChangelistBuilder(mem, changes).SetInclude(&filter).Changes(tree_lib, tree_util);
+
+    ASSERT_EQ(changes.size(), 3u);
+
+    EXPECT_EQ(changes[0].action, PathAction::Change);
+    EXPECT_EQ(changes[0].path, "lib/test.h");
+    EXPECT_EQ(changes[0].type, PathType::File);
+
+    EXPECT_EQ(changes[1].action, PathAction::Add);
+    EXPECT_EQ(changes[1].path, "util");
+    EXPECT_EQ(changes[1].type, PathType::Directory);
+
+    EXPECT_EQ(changes[2].action, PathAction::Add);
+    EXPECT_EQ(changes[2].path, "util/string.h");
+    EXPECT_EQ(changes[2].type, PathType::File);
 }

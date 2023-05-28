@@ -106,9 +106,10 @@ int ShowCommit(const Options& options, const Commit& commit, const Datastore& od
             }
         };
 
-        ChangelistBuilder(odb, cb).SetExpandDirectories(true).Changes(
-            commit.Parents() ? commit.Parents()[0] : HashId(), options.id
-        );
+        ChangelistBuilder(odb, cb)
+            .SetExpandDirectories(true)
+            .SetInclude(options.paths.Empty() ? nullptr : &options.paths)
+            .Changes(commit.Parents() ? commit.Parents()[0] : HashId(), options.id);
     }
 
     return 0;

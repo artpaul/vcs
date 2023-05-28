@@ -69,7 +69,7 @@ public:
     bool IsParent(const std::string_view path) const {
         // Nothing to match.
         if (patterns_.empty() || path.empty()) {
-           return true;
+            return true;
         }
 
         const auto& parts = SplitPath(path);
