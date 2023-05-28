@@ -97,9 +97,9 @@ void Workspace::Status(const StatusOptions& options, const StatusCallback& cb) c
 
 std::string Workspace::ToTreePath(const std::filesystem::path& path) const {
     if (path.is_relative()) {
-        return (std::filesystem::current_path() / path).lexically_relative(working_tree_->GetPath());
+        return std::filesystem::relative(std::filesystem::current_path() / path, working_tree_->GetPath());
     }
-    return path.lexically_relative(working_tree_->GetPath());
+    return std::filesystem::relative(path, working_tree_->GetPath());
 }
 
 StageArea Workspace::GetStage() const {

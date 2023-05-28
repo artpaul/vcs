@@ -264,7 +264,7 @@ void WorkingTree::Status(const StatusOptions& options, const StageArea& stage, c
             const auto path_type = entry.is_regular_file() ? PathType::File : PathType::Symlink;
 
             if (is_not_match(path)) {
-                return;
+                continue;
             }
 
             if (const auto ei = state.top().Find(filename)) {
