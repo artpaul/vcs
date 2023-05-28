@@ -107,15 +107,44 @@ std::optional<PathEntry> WorkingTree::MakeBlob(const std::string& path, Datastor
     return std::nullopt;
 }
 
+void WorkingTree::CreateDirectory(const std::string& p) {
+    const auto path = path_ / p;
+    const auto status = std::filesystem::symlink_status(path);
+
+    if (status.type() == std::filesystem::file_type::not_found) {
+        // Create directory.
+        std::filesystem::create_directories(path);
+    } else if (status.type() == std::filesystem::file_type::directory) {
+        // Already a directory.
+    } else {
+        // Remove the current state.
+        std::filesystem::remove_all(path);
+        // Create directory.
+        std::filesystem::create_directories(path);
+    }
+}
+
 void WorkingTree::Checkout(const HashId& tree_id) {
     if (tree_id) {
         MakeTree(path_, odb_.LoadTree(tree_id));
     }
 }
 
-void WorkingTree::Checkout(const std::string& path, const PathEntry& entry) {
-    (void)path;
-    (void)entry;
+void WorkingTree::Checkout(const std::string& p, const PathEntry& entry) {
+    const auto path = path_ / p;
+
+    if (IsDirectory(entry.type)) {
+        MakeTree(path, odb_.LoadTree(entry.id));
+    } else {
+        const auto status = std::filesystem::symlink_status(path);
+
+        // Remove the current state if required.
+        if (status.type() == std::filesystem::file_type::directory) {
+            std::filesystem::remove_all(path);
+        }
+
+        WriteBlob(path, entry);
+    }
 }
 
 void WorkingTree::MakeTree(const std::filesystem::path& root, const Tree tree) const {
@@ -164,10 +193,10 @@ void WorkingTree::WriteBlob(const std::filesystem::path& path, const PathEntry& 
         auto obj = odb_.Load(entry.id);
 
         if (obj.Type() == DataType::Blob) {
-            auto file = File::ForAppend(path);
+            auto file = File::ForOverwrite(path);
             file.Write(obj.Data(), obj.Size());
         } else if (obj.Type() == DataType::Index) {
-            auto file = File::ForAppend(path);
+            auto file = File::ForOverwrite(path);
             for (const auto& part : obj.AsIndex().Parts()) {
                 auto blob = odb_.LoadBlob(part.Id());
                 file.Write(blob.Data(), blob.Size());

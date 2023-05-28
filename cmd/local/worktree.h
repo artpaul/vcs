@@ -23,6 +23,9 @@ public:
     std::optional<PathEntry> MakeBlob(const std::string& path, Datastore odb) const;
 
 public:
+    /** Create directory. */
+    void CreateDirectory(const std::string& path);
+
     /** Checkout a tree into the working directory. */
     void Checkout(const HashId& tree_id);
 

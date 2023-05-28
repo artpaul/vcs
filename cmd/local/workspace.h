@@ -50,6 +50,9 @@ public:
     /** */
     HashId Commit(const std::string& message, const std::vector<PathStatus>& changes);
 
+    /** */
+    bool Restore(const std::string& path);
+
     /** Emits status of changed items in the working tree. */
     void Status(const StatusOptions& options, const StatusCallback& cb) const;
 
@@ -59,11 +62,11 @@ public:
     /**@}*/
 
 private:
-    StageArea GetStage() const;
+    StageArea* GetStage() const;
 
 private:
     std::filesystem::path state_path_;
-
+    /// Cached instance of stage area.
     mutable std::unique_ptr<StageArea> stage_;
 
     std::unique_ptr<WorkingTree> working_tree_;

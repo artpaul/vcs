@@ -56,10 +56,10 @@ HashId Workspace::Commit(const std::string& message, const std::vector<PathStatu
 
     for (const auto& change : changes) {
         if (change.status == PathStatus::Deleted) {
-            stage.Remove(change.path);
+            stage->Remove(change.path);
         } else {
             if (auto blob = working_tree_->MakeBlob(change.path, odb_)) {
-                stage.Add(change.path, *blob);
+                stage->Add(change.path, *blob);
             } else {
                 throw std::runtime_error(fmt::format("cannot make blob from '{}'", change.path));
             }
@@ -69,7 +69,7 @@ HashId Workspace::Commit(const std::string& message, const std::vector<PathStatu
     const auto now = std::chrono::system_clock::now();
     CommitBuilder builder;
     builder.message = message;
-    builder.tree = stage.SaveTree(odb_);
+    builder.tree = stage->SaveTree(odb_);
     // Author.
     builder.author.when = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
     // Committer.
@@ -84,6 +84,8 @@ HashId Workspace::Commit(const std::string& message, const std::vector<PathStatu
     // Store commit object.
     const HashId id = odb_.Put(DataType::Commit, builder.Serialize());
 
+    // Reset stage.
+    stage_.reset();
     // Update head of the branch.
     branch.head = id;
     branches_->Put(branch.name, branch);
@@ -91,21 +93,45 @@ HashId Workspace::Commit(const std::string& message, const std::vector<PathStatu
     return id;
 }
 
+bool Workspace::Restore(const std::string& path) {
+    if (const auto& entry = GetStage()->GetEntry(path)) {
+        if (entry->id) {
+            working_tree_->Checkout(path, *entry);
+        } else {
+            assert(IsDirectory(entry->type));
+
+            working_tree_->CreateDirectory(path);
+        }
+        return true;
+    }
+    return false;
+}
+
 void Workspace::Status(const StatusOptions& options, const StatusCallback& cb) const {
-    working_tree_->Status(options, GetStage(), cb);
+    working_tree_->Status(options, *GetStage(), cb);
 }
 
 std::string Workspace::ToTreePath(const std::filesystem::path& path) const {
-    if (path.is_relative()) {
-        return std::filesystem::relative(std::filesystem::current_path() / path, working_tree_->GetPath());
+    auto result =
+        path.is_relative()
+            ? std::filesystem::relative(std::filesystem::current_path() / path, working_tree_->GetPath())
+            : std::filesystem::relative(path, working_tree_->GetPath());
+
+    if (result == ".") {
+        return std::string();
+    } else {
+        return result;
     }
-    return std::filesystem::relative(path, working_tree_->GetPath());
 }
 
-StageArea Workspace::GetStage() const {
-    const auto head = GetCurrentHead();
+StageArea* Workspace::GetStage() const {
+    if (!bool(stage_)) {
+        const auto head = GetCurrentHead();
 
-    return StageArea(odb_, head ? odb_.LoadCommit(head).Tree() : HashId());
+        stage_ = std::make_unique<StageArea>(odb_, head ? odb_.LoadCommit(head).Tree() : HashId());
+    }
+
+    return stage_.get();
 }
 
 } // namespace Vcs

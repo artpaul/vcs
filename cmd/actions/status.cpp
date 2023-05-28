@@ -51,8 +51,7 @@ void ChangesInfo(const Options& options, const Workspace& repo) {
     process_paths(untracked);
 
     if (tracked.size()) {
-        fmt::print("\nChanges not staged for commit:\n");
-        fmt::print("  (use \"vcs add <file>...\" to update what will be commited)\n");
+        fmt::print("\nChanges to be committed:\n");
         fmt::print("  (use \"vcs restore <file>...\" to discard changes in working directory)\n");
 
         for (const auto& status : tracked) {
