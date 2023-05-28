@@ -5,6 +5,7 @@
 using namespace Vcs;
 
 TEST(DataHeader, Bytes) {
+    EXPECT_EQ(DataHeader().Bytes(), 1u);
     EXPECT_EQ(DataHeader::Make(DataType::Blob, 0ull).Bytes(), 1u);
     EXPECT_EQ(DataHeader::Make(DataType::Blob, 1ull).Bytes(), 2u);
     EXPECT_EQ(DataHeader::Make(DataType::Blob, 115ull).Bytes(), 2u);

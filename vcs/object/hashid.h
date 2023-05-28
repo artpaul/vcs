@@ -54,6 +54,12 @@ public:
     /** Makes canonical object hash. */
     static HashId Make(const DataType type, const std::string_view content);
 
+    /** Maximum value of HashId. */
+    static HashId Max() noexcept;
+
+    /** Minimum value of HashId. */
+    static HashId Min() noexcept;
+
 public:
     constexpr auto Data() const noexcept -> const unsigned char (&)[20] {
         return data_;

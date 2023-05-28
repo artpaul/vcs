@@ -23,6 +23,11 @@ TEST(HashId, Builder) {
     );
 }
 
+TEST(HashId, Compare) {
+    EXPECT_LT(HashId::Min(), HashId::Max());
+    EXPECT_EQ(HashId::Min(), HashId());
+}
+
 TEST(HashId, Empty) {
     EXPECT_EQ(HashId().ToHex(), "0000000000000000000000000000000000000000");
     EXPECT_FALSE(bool(HashId()));

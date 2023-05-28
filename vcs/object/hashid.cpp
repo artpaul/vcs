@@ -133,6 +133,16 @@ HashId HashId::Make(const DataType type, const std::string_view content) {
     return Builder().Append(DataHeader::Make(type, content.size())).Append(content).Build();
 }
 
+HashId HashId::Max() noexcept {
+    HashId id;
+    std::fill_n(id.data_, sizeof(id.data_), 0xff);
+    return id;
+}
+
+HashId HashId::Min() noexcept {
+    return HashId();
+}
+
 std::string HashId::ToHex() const {
     char hex[2 * sizeof(data_)];
     BytesToHex(data_, hex);
