@@ -196,11 +196,11 @@ void WorkingTree::Status(const StatusOptions& options, const StageArea& stage, c
     state.emplace(std::string(), stage.ListTree(std::string()));
 
     const auto is_not_match = [&](const auto& path) {
-        return options.include && !options.include->Match(path);
+        return !options.include.Match(path);
     };
 
     const auto is_not_parent = [&](const auto& path) {
-        return options.include && !options.include->IsParent(path);
+        return !options.include.IsParent(path);
     };
 
     const auto emit_deleted = [&](const size_t depth) {

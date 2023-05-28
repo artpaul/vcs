@@ -49,6 +49,7 @@ target_link_libraries(libvcs3 PUBLIC
 
 target_sources(libvcs3 PRIVATE
     "changes/changelist.cpp"
+    "changes/path.cpp"
     "changes/revwalk.cpp"
     "changes/stage.cpp"
     "changes/validate.cpp"

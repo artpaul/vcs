@@ -13,7 +13,7 @@ namespace {
 
 struct Options {
     std::string message;
-    PathFilter paths;
+    std::vector<std::string> paths;
 };
 
 int Execute(const Options& options, Workspace& repo) {
@@ -32,8 +32,8 @@ int Execute(const Options& options, Workspace& repo) {
     repo.Status(
         StatusOptions()
             .SetTracked(true)
-            .SetUntracked(options.paths.Empty() ? Expansion::None : Expansion::All)
-            .SetInclude(&options.paths),
+            .SetUntracked(options.paths.empty() ? Expansion::None : Expansion::All)
+            .SetInclude(PathFilter(options.paths)),
         cb
     );
 
@@ -98,9 +98,10 @@ int ExecuteCommit(int argc, char* argv[], const std::function<Workspace&()>& cb)
         }
         if (opts.has("paths")) {
             const auto paths = opts["paths"].as<std::vector<std::string>>();
+            const auto& repo = cb();
 
             for (const auto& path : paths) {
-                options.paths.Append(path);
+                options.paths.push_back(repo.ToTreePath(path));
             }
         }
     }

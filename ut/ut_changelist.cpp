@@ -92,7 +92,7 @@ TEST(ChangelistBuilder, IncludeFilter) {
     const HashId tree_util = MakeTreeUtil(mem);
 
     std::vector<Change> changes;
-    ChangelistBuilder(mem, changes).SetInclude(&filter).Changes(tree_lib, tree_util);
+    ChangelistBuilder(mem, changes).SetInclude(filter).Changes(tree_lib, tree_util);
 
     ASSERT_EQ(changes.size(), 3u);
 

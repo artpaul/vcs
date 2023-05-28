@@ -14,7 +14,7 @@ namespace {
 
 struct Options {
     /// Paths to include in status.
-    PathFilter paths;
+    std::vector<std::string> paths;
 };
 
 void BranchInfo(const Options&, const Workspace& repo) {
@@ -33,7 +33,7 @@ void ChangesInfo(const Options& options, const Workspace& repo) {
     std::vector<PathStatus> tracked;
     std::vector<PathStatus> untracked;
 
-    repo.Status(StatusOptions().SetInclude(&options.paths), [&](const PathStatus& status) {
+    repo.Status(StatusOptions().SetInclude(PathFilter(options.paths)), [&](const PathStatus& status) {
         if (status.status == PathStatus::Deleted || status.status == PathStatus::Modified) {
             tracked.push_back(status);
         }
@@ -129,11 +129,10 @@ int ExecuteStatus(int argc, char* argv[], const std::function<Workspace&()>& cb)
         }
         if (opts.has("paths")) {
             const auto& paths = opts["paths"].as<std::vector<std::string>>();
-            // const auto& repo = cb();
+            const auto& repo = cb();
 
             for (const auto& path : paths) {
-                options.paths.Append(path);
-                // options.paths.Append(repo.ToTreePath(path));
+                options.paths.push_back(repo.ToTreePath(path));
             }
         }
     }

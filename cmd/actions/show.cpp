@@ -14,7 +14,7 @@ namespace {
 
 struct Options {
     HashId id{};
-    PathFilter paths;
+    std::vector<std::string> paths;
     bool name_only = false;
     bool name_status = false;
 };
@@ -108,7 +108,7 @@ int ShowCommit(const Options& options, const Commit& commit, const Datastore& od
 
         ChangelistBuilder(odb, cb)
             .SetExpandDirectories(true)
-            .SetInclude(options.paths.Empty() ? nullptr : &options.paths)
+            .SetInclude(PathFilter(options.paths))
             .Changes(commit.Parents() ? commit.Parents()[0] : HashId(), options.id);
     }
 
@@ -172,7 +172,7 @@ int ExecuteShow(int argc, char* argv[], const std::function<Workspace&()>& cb) {
             }
 
             for (size_t i = (bool(options.id) ? 1 : 0), end = args.size(); i < end; ++i) {
-                options.paths.Append(repo.ToTreePath(args[i]));
+                options.paths.push_back(repo.ToTreePath(args[i]));
             }
         }
 

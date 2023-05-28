@@ -61,15 +61,15 @@ struct StatusOptions {
     /// Emit untracked items.
     Expansion untracked = Expansion::Normal;
     /// Paths to include.
-    const PathFilter* include = nullptr;
+    PathFilter include;
 
     StatusOptions& SetIgnored(Expansion value) {
         ignored = value;
         return *this;
     }
 
-    StatusOptions& SetInclude(const PathFilter* value) {
-        include = value;
+    StatusOptions& SetInclude(PathFilter value) {
+        include = std::move(value);
         return *this;
     }
 

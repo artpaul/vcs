@@ -1,6 +1,7 @@
 #pragma once
 
 #include "change.h"
+#include "path.h"
 
 #include <vcs/object/object.h>
 #include <vcs/object/path.h>
@@ -11,7 +12,6 @@
 namespace Vcs {
 
 class Datastore;
-class PathFilter;
 
 class ChangelistBuilder {
 public:
@@ -22,7 +22,7 @@ public:
 
     ChangelistBuilder& SetExpandDirectories(bool value) noexcept;
 
-    ChangelistBuilder& SetInclude(const PathFilter* value) noexcept;
+    ChangelistBuilder& SetInclude(PathFilter value) noexcept;
 
 private:
     void EmitAdd(const std::string& path, const PathType type);
@@ -45,7 +45,7 @@ private:
 private:
     const Datastore& odb_;
     std::function<void(Change)> cb_;
-    const PathFilter* filter_ = nullptr;
+    PathFilter filter_;
     /// Expand content created or deleted directories.
     bool expand_directories_ = true;
 };
