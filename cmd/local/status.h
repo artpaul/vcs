@@ -37,17 +37,22 @@ struct PathStatus {
     /// Entry from base tree.
     std::optional<PathEntry> entry;
 
-    PathStatus& SetPath(std::string value) {
+    PathStatus& SetEntry(const PathEntry& value) noexcept {
+        entry = value;
+        return *this;
+    }
+
+    PathStatus& SetPath(std::string value) noexcept {
         path = std::move(value);
         return *this;
     }
 
-    PathStatus& SetStatus(const Status value) {
+    PathStatus& SetStatus(const Status value) noexcept {
         status = value;
         return *this;
     }
 
-    PathStatus& SetType(const PathType value) {
+    PathStatus& SetType(const PathType value) noexcept {
         type = value;
         return *this;
     }
@@ -63,22 +68,22 @@ struct StatusOptions {
     /// Paths to include.
     PathFilter include;
 
-    StatusOptions& SetIgnored(Expansion value) {
+    StatusOptions& SetIgnored(Expansion value) noexcept {
         ignored = value;
         return *this;
     }
 
-    StatusOptions& SetInclude(PathFilter value) {
+    StatusOptions& SetInclude(PathFilter value) noexcept {
         include = std::move(value);
         return *this;
     }
 
-    StatusOptions& SetTracked(bool value) {
+    StatusOptions& SetTracked(bool value) noexcept {
         tracked = value;
         return *this;
     }
 
-    StatusOptions& SetUntracked(Expansion value) {
+    StatusOptions& SetUntracked(Expansion value) noexcept {
         untracked = value;
         return *this;
     }

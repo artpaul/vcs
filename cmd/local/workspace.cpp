@@ -111,6 +111,10 @@ void Workspace::Status(const StatusOptions& options, const StatusCallback& cb) c
     working_tree_->Status(options, *GetStage(), cb);
 }
 
+std::filesystem::path Workspace::ToAbsolutePath(const std::string& path) const {
+    return working_tree_->GetPath() / path;
+}
+
 std::string Workspace::ToTreePath(const std::filesystem::path& path) const {
     auto result =
         path.is_relative()

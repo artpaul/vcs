@@ -13,6 +13,8 @@ enum class Action {
     Clean,
     /// Record changes to the repository.
     Commit,
+    /// Show changes between commits, commit and working tree, etc.
+    Diff,
     /// Create an empty repository.
     Init,
     /// Show commit log.

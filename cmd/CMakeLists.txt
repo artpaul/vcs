@@ -24,6 +24,7 @@ target_sources(vcs PRIVATE
     "actions.cpp"
     "actions/branch.cpp"
     "actions/commit.cpp"
+    "actions/diff.cpp"
     "actions/dump.cpp"
     "actions/git.cpp"
     "actions/init.cpp"

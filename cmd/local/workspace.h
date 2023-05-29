@@ -56,6 +56,9 @@ public:
     /** Emits status of changed items in the working tree. */
     void Status(const StatusOptions& options, const StatusCallback& cb) const;
 
+    /** Converts working tree path to filesystem path. */
+    std::filesystem::path ToAbsolutePath(const std::string& path) const;
+
     /** Converts filesystem path to a path relative the working tree. */
     std::string ToTreePath(const std::filesystem::path& path) const;
 

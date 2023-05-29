@@ -239,7 +239,11 @@ void WorkingTree::Status(const StatusOptions& options, const StageArea& stage, c
                     if (is_not_match(path)) {
                         return;
                     }
-                    cb(PathStatus().SetPath(path).SetStatus(PathStatus::Deleted).SetType(entry.type));
+                    cb(PathStatus()
+                           .SetEntry(entry)
+                           .SetPath(path)
+                           .SetStatus(PathStatus::Deleted)
+                           .SetType(entry.type));
                 });
             }
 
@@ -301,20 +305,29 @@ void WorkingTree::Status(const StatusOptions& options, const StageArea& stage, c
                     // Previous directory entry.
                     if (options.tracked) {
                         cb(PathStatus()
+                               .SetEntry(*ei)
                                .SetPath(path)
                                .SetStatus(PathStatus::Deleted)
                                .SetType(PathType::Directory));
                     }
                     // Current file entry.
                     if (options.untracked != Expansion::None) {
-                        cb(PathStatus().SetPath(path).SetStatus(PathStatus::Untracked).SetType(path_type));
+                        cb(PathStatus()
+                               .SetEntry(*ei)
+                               .SetPath(path)
+                               .SetStatus(PathStatus::Untracked)
+                               .SetType(path_type));
                     }
                 } else if (options.tracked) {
                     if (CompareBlobEntry(*ei, entry, odb_)) {
                         continue;
                     }
 
-                    cb(PathStatus().SetPath(path).SetStatus(PathStatus::Modified).SetType(path_type));
+                    cb(PathStatus()
+                           .SetEntry(*ei)
+                           .SetPath(path)
+                           .SetStatus(PathStatus::Modified)
+                           .SetType(path_type));
                 }
             } else if (options.untracked != Expansion::None) {
                 cb(PathStatus().SetPath(path).SetStatus(PathStatus::Untracked).SetType(path_type));
