@@ -80,6 +80,11 @@ public:
     void CreateBranch(const std::string& name, const HashId head);
 
     /**
+     * Deletes a branch.
+     */
+    void DeleteBranch(const std::string& name);
+
+    /**
      * Returns state of the branch.
      */
     std::optional<Branch> GetBranch(const std::string& name) const;

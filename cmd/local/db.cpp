@@ -20,8 +20,32 @@ public:
         }
     }
 
-    void Delete(const std::string_view key) {
-        (void)key;
+    void Delete(const std::string_view k) {
+        MDB_dbi dbi;
+        MDB_txn* txn = nullptr;
+        Check(mdb_txn_begin(env_, nullptr, 0, &txn));
+        Check(mdb_dbi_open(txn, nullptr, 0, &dbi));
+
+        MDB_val key;
+        key.mv_size = k.size();
+        key.mv_data = (void*)k.data();
+
+        int rc = mdb_del(txn, dbi, &key, nullptr);
+        if (rc != 0 && rc != MDB_NOTFOUND) {
+            mdb_dbi_close(env_, dbi);
+            throw std::runtime_error(fmt::format("cannot del data: {}", mdb_strerror(rc)));
+        }
+        if (rc == MDB_NOTFOUND) {
+            mdb_txn_abort(txn);
+        } else {
+            rc = mdb_txn_commit(txn);
+            if (rc != 0) {
+                mdb_dbi_close(env_, dbi);
+                throw std::runtime_error(fmt::format("cannot commit: {}", mdb_strerror(rc)));
+            }
+        }
+
+        mdb_dbi_close(env_, dbi);
     }
 
     void Enumerate(const std::function<bool(const std::string_view, const std::string_view)>& cb) const {

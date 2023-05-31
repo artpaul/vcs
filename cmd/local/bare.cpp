@@ -71,6 +71,10 @@ void Repository::CreateBranch(const std::string& name, const HashId head) {
     branches_->Put(name, Branch{.name = name, .head = head});
 }
 
+void Repository::DeleteBranch(const std::string& name) {
+    branches_->Delete(name);
+}
+
 std::optional<Repository::Branch> Repository::GetBranch(const std::string& name) const {
     return branches_->Get(name);
 }
