@@ -45,10 +45,10 @@ TEST(ChangelistBuilder, Changes) {
     ASSERT_EQ(changes.size(), 5u);
 
     EXPECT_EQ(changes[0].action, PathAction::Delete);
-    EXPECT_EQ(changes[0].path, "bin");
+    EXPECT_EQ(changes[0].path, "bin/main.cpp");
 
     EXPECT_EQ(changes[1].action, PathAction::Delete);
-    EXPECT_EQ(changes[1].path, "bin/main.cpp");
+    EXPECT_EQ(changes[1].path, "bin");
 
     EXPECT_EQ(changes[2].action, PathAction::Change);
     EXPECT_EQ(changes[2].path, "lib/test.h");
@@ -68,7 +68,10 @@ TEST(ChangelistBuilder, ChangesNoDirectoryExpansion) {
     HashId tree_util = MakeTreeUtil(mem);
 
     std::vector<Change> changes;
-    ChangelistBuilder(mem, changes).SetExpandDirectories(false).Changes(tree_lib, tree_util);
+    ChangelistBuilder(mem, changes)
+        .SetExpandAdded(false)
+        .SetExpandDeleted(false)
+        .Changes(tree_lib, tree_util);
 
     ASSERT_EQ(changes.size(), 3u);
 
@@ -82,6 +85,36 @@ TEST(ChangelistBuilder, ChangesNoDirectoryExpansion) {
     EXPECT_EQ(changes[2].action, PathAction::Add);
     EXPECT_EQ(changes[2].type, PathType::Directory);
     EXPECT_EQ(changes[2].path, "util");
+}
+
+TEST(ChangelistBuilder, ExpandDeleted) {
+    auto mem = Datastore::Make<Store::MemoryCache>();
+
+    StageArea index(mem);
+
+    index.Add("a/b/c", MakeBlob("b", mem));
+    index.Add("a/b/d", MakeBlob("b", mem));
+    index.Add("a/a", MakeBlob("b", mem));
+
+    std::vector<Change> changes;
+    ChangelistBuilder(mem, changes).Changes(index.SaveTree(mem), HashId());
+
+    ASSERT_EQ(changes.size(), 5u);
+
+    EXPECT_EQ(changes[0].path, "a/a");
+    EXPECT_EQ(changes[0].type, PathType::File);
+
+    EXPECT_EQ(changes[1].path, "a/b/c");
+    EXPECT_EQ(changes[1].type, PathType::File);
+
+    EXPECT_EQ(changes[2].path, "a/b/d");
+    EXPECT_EQ(changes[2].type, PathType::File);
+
+    EXPECT_EQ(changes[3].path, "a/b");
+    EXPECT_EQ(changes[3].type, PathType::Directory);
+
+    EXPECT_EQ(changes[4].path, "a");
+    EXPECT_EQ(changes[4].type, PathType::Directory);
 }
 
 TEST(ChangelistBuilder, IncludeFilter) {

@@ -20,7 +20,9 @@ public:
 
     void Changes(const HashId& from, const HashId& to);
 
-    ChangelistBuilder& SetExpandDirectories(bool value) noexcept;
+    ChangelistBuilder& SetExpandAdded(bool value) noexcept;
+
+    ChangelistBuilder& SetExpandDeleted(bool value) noexcept;
 
     ChangelistBuilder& SetInclude(PathFilter value) noexcept;
 
@@ -46,8 +48,10 @@ private:
     const Datastore& odb_;
     std::function<void(Change)> cb_;
     PathFilter filter_;
-    /// Expand content created or deleted directories.
-    bool expand_directories_ = true;
+    /// Expand content of created directories.
+    bool expand_added_ = true;
+    /// Expand content of deleted directories.
+    bool expand_deleted_ = true;
 };
 
 } // namespace Vcs

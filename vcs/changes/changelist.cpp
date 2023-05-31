@@ -54,8 +54,13 @@ ChangelistBuilder::ChangelistBuilder(const Datastore& odb, std::vector<Change>& 
     , cb_([&changes](Change change) { changes.push_back(std::move(change)); }) {
 }
 
-ChangelistBuilder& ChangelistBuilder::SetExpandDirectories(bool value) noexcept {
-    expand_directories_ = value;
+ChangelistBuilder& ChangelistBuilder::SetExpandAdded(bool value) noexcept {
+    expand_added_ = value;
+    return *this;
+}
+
+ChangelistBuilder& ChangelistBuilder::SetExpandDeleted(bool value) noexcept {
+    expand_deleted_ = value;
     return *this;
 }
 
@@ -114,7 +119,7 @@ void ChangelistBuilder::EmitDelete(const std::string& path, const PathType type)
 void ChangelistBuilder::ProcessAdded(const std::string& path, const Tree::Entry to) {
     EmitAdd(path, to.Type());
 
-    if (IsDirectory(to.Type()) && expand_directories_ && filter_.IsParent(path)) {
+    if (IsDirectory(to.Type()) && expand_added_ && filter_.IsParent(path)) {
         const auto& tree = odb_.LoadTree(to.Id());
 
         for (const auto entry : tree.Entries()) {
@@ -143,15 +148,15 @@ void ChangelistBuilder::ProcessChanged(
 }
 
 void ChangelistBuilder::ProcessDeleted(const std::string& path, const Tree::Entry from) {
-    EmitDelete(path, from.Type());
-
-    if (IsDirectory(from.Type()) && expand_directories_ && filter_.IsParent(path)) {
+    if (IsDirectory(from.Type()) && expand_deleted_ && filter_.IsParent(path)) {
         const auto& tree = odb_.LoadTree(from.Id());
 
         for (const auto entry : tree.Entries()) {
             ProcessDeleted(JoinPath(path, entry.Name()), entry);
         }
     }
+
+    EmitDelete(path, from.Type());
 }
 
 void ChangelistBuilder::TreeChanges(const std::string& path, const Tree& from, const Tree& to) {

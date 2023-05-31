@@ -107,7 +107,8 @@ int ShowCommit(const Options& options, const Commit& commit, const Datastore& od
         };
 
         ChangelistBuilder(odb, cb)
-            .SetExpandDirectories(true)
+            .SetExpandAdded(true)
+            .SetExpandDeleted(true)
             .SetInclude(PathFilter(options.paths))
             .Changes(commit.Parents() ? commit.Parents()[0] : HashId(), options.id);
     }
