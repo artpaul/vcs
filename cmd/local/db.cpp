@@ -116,6 +116,7 @@ public:
         val.mv_size = value.size();
         val.mv_data = (void*)value.data();
 
+        // TODO: MDB_NOOVERWRITE
         int rc = mdb_put(txn, dbi, &key, &val, 0);
         if (rc != 0) {
             mdb_dbi_close(env_, dbi);

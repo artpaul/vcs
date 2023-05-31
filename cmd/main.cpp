@@ -17,6 +17,7 @@ extern int ExecuteLog(int argc, char* argv[], const std::function<Workspace&()>&
 extern int ExecuteRestore(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteShow(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteStatus(int argc, char* argv[], const std::function<Workspace&()>& cb);
+extern int ExecuteSwitch(int argc, char* argv[], const std::function<Workspace&()>& cb);
 
 static int Main(int argc, char* argv[]) {
     if (argc < 2) {
@@ -94,7 +95,7 @@ static int Main(int argc, char* argv[]) {
         case Action::Status:
             return ExecuteStatus(argc - 1, argv + 1, get_workspace);
         case Action::Switch:
-            break;
+            return ExecuteSwitch(argc - 1, argv + 1, get_workspace);
         case Action::Workspace:
             break;
         case Action::Unknown:

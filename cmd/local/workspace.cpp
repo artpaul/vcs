@@ -15,7 +15,9 @@ namespace Vcs {
 
 Workspace::Workspace(const std::filesystem::path& bare_path, const std::filesystem::path& work_path)
     : Repository(bare_path) {
-    working_tree_ = std::make_unique<WorkingTree>(work_path, odb_);
+    working_tree_ = std::make_unique<WorkingTree>(work_path, odb_, [this]() {
+        return HashId::FromHex(StringFromFile(state_path_ / "TREE"));
+    });
     // Lookup workspace.
     if (const auto& ws = workspaces_->Get(work_path.string())) {
         state_path_ = bare_path_ / "workspaces" / ws->name;
@@ -89,6 +91,8 @@ HashId Workspace::Commit(const std::string& message, const std::vector<PathStatu
     // Update head of the branch.
     branch.head = id;
     branches_->Put(branch.name, branch);
+    // Update base of working tree.
+    StringToFile(state_path_ / "TREE", builder.tree.ToHex());
 
     return id;
 }
@@ -109,6 +113,35 @@ bool Workspace::Restore(const std::string& path) {
 
 void Workspace::Status(const StatusOptions& options, const StatusCallback& cb) const {
     working_tree_->Status(options, *GetStage(), cb);
+}
+
+bool Workspace::SwitchTo(const std::string& branch) {
+    const auto current = GetCurrentBranch();
+    const auto target = branches_->Get(branch);
+
+    // Target branch should exist.
+    if (!bool(target)) {
+        return false;
+    }
+    // Same branch. Nothing to do.
+    if (current.name == target->name) {
+        return true;
+    }
+
+    const auto tree_id = target->head ? odb_.LoadCommit(target->head).Tree() : HashId();
+
+    if (!working_tree_->SwitchTo(tree_id)) {
+        return false;
+    }
+
+    // Reset stage.
+    stage_.reset();
+    // Update base of working tree.
+    StringToFile(state_path_ / "TREE", tree_id.ToHex());
+    // Update HEAD.
+    SetCurrentBranch(branch);
+
+    return true;
 }
 
 std::filesystem::path Workspace::ToAbsolutePath(const std::string& path) const {
@@ -136,6 +169,10 @@ StageArea* Workspace::GetStage() const {
     }
 
     return stage_.get();
+}
+
+void Workspace::SetCurrentBranch(const std::string_view name) {
+    StringToFile(state_path_ / "HEAD", name);
 }
 
 } // namespace Vcs

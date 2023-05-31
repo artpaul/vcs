@@ -1,5 +1,6 @@
 #include "worktree.h"
 
+#include <vcs/changes/changelist.h>
 #include <vcs/object/serialize.h>
 
 #include <util/file.h>
@@ -68,9 +69,11 @@ private:
 
 } // namespace
 
-WorkingTree::WorkingTree(const std::filesystem::path& path, Datastore odb)
+WorkingTree::WorkingTree(const std::filesystem::path& path, Datastore odb, std::function<HashId()> cb)
     : path_(path)
-    , odb_(std::move(odb)) {
+    , odb_(std::move(odb))
+    , get_tree_(std::move(cb)) {
+    assert(get_tree_);
 }
 
 const std::filesystem::path& WorkingTree::GetPath() const {
@@ -145,6 +148,33 @@ void WorkingTree::Checkout(const std::string& p, const PathEntry& entry) {
 
         WriteBlob(path, entry);
     }
+}
+
+bool WorkingTree::SwitchTo(const HashId& tree_id) {
+    StageArea stage(odb_, tree_id); // TODO: mem cache.
+
+    auto cb = [&](const Change& change) {
+        if (change.action == PathAction::Add || change.action == PathAction::Change) {
+            if (change.type == PathType::Directory) {
+                CreateDirectory(change.path);
+            } else if (const auto& e = stage.GetEntry(change.path)) {
+                WriteBlob(path_ / change.path, *e);
+            } else {
+                // Reported entry should always be in the target tree.
+                assert(false);
+            }
+        } else if (change.action == PathAction::Delete) {
+            std::filesystem::remove_all(path_ / change.path);
+        }
+    };
+
+    // Caclculate changelist.
+    ChangelistBuilder(odb_, std::move(cb))
+        .SetExpandAdded(true)
+        .SetExpandDeleted(false)
+        .Changes(get_tree_(), tree_id);
+
+    return true;
 }
 
 void WorkingTree::MakeTree(const std::filesystem::path& root, const Tree tree) const {

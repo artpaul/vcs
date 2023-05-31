@@ -36,6 +36,8 @@ public:
 
     std::optional<HashId> ResolveReference(const std::string_view ref) const;
 
+    void SetCurrentBranch(const std::string_view name);
+
     /**@}*/
 
 public:
@@ -55,6 +57,9 @@ public:
 
     /** Emits status of changed items in the working tree. */
     void Status(const StatusOptions& options, const StatusCallback& cb) const;
+
+    /** Switches working are to the given branch. */
+    bool SwitchTo(const std::string& branch);
 
     /** Converts working tree path to filesystem path. */
     std::filesystem::path ToAbsolutePath(const std::string& path) const;

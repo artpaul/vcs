@@ -32,4 +32,5 @@ target_sources(vcs PRIVATE
     "actions/restore.cpp"
     "actions/show.cpp"
     "actions/status.cpp"
+    "actions/switch.cpp"
 )

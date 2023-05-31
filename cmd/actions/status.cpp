@@ -64,7 +64,7 @@ void ChangesInfo(const Options& options, const Workspace& repo) {
                 return "";
             };
 
-            const auto status_style = [&] {
+            const auto status_style = [] {
                 if (util::is_atty(stdout)) {
                     return fmt::fg(fmt::terminal_color::red);
                 } else {

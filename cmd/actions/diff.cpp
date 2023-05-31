@@ -160,7 +160,7 @@ void PrintBlob(const PathStatus& status, const Workspace& repo, size_t lines) {
 }
 
 void PrintHeader(const PathStatus& status) {
-    const auto style = [&]() {
+    const auto style = []() {
         if (util::is_atty(stdout)) {
             return fmt::text_style(fmt::emphasis::bold);
         }
