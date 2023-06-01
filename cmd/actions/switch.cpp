@@ -44,8 +44,14 @@ int Execute(const Options& options, Workspace& repo) {
             repo.SetCurrentBranch(options.branch_name);
             return 0;
         } else {
+            fmt::print(stderr, "error: unknown branch '{}'\n", options.branch_name);
             return 1;
         }
+    }
+    // Same branch. Nothing to do.
+    if (target->name == repo.GetCurrentBranch().name) {
+        fmt::print("Already on '{}'\n", options.branch_name);
+        return 0;
     }
     // Check conflicts with local modifications.
     if (options.force) {
@@ -111,6 +117,7 @@ int Execute(const Options& options, Workspace& repo) {
     }
 
     if (repo.SwitchTo(options.branch_name)) {
+        fmt::print("Switched to branch '{}'\n", options.branch_name);
         return 0;
     } else {
         fmt::print(stderr, "error: cannot switch to '{}'\n", options.branch_name);
