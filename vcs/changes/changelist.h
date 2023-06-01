@@ -1,8 +1,8 @@
 #pragma once
 
-#include "change.h"
 #include "path.h"
 
+#include <vcs/object/change.h>
 #include <vcs/object/object.h>
 #include <vcs/object/path.h>
 

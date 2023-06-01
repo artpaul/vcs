@@ -1,7 +1,6 @@
 #pragma once
 
-#include "change.h"
-
+#include <vcs/object/change.h>
 #include <vcs/object/hashid.h>
 #include <vcs/object/path.h>
 #include <vcs/object/store.h>

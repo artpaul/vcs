@@ -1,7 +1,7 @@
 #pragma once
 
-#include <vcs/object/hashid.h>
-#include <vcs/object/path.h>
+#include "hashid.h"
+#include "path.h"
 
 #include <string>
 
@@ -22,7 +22,7 @@ struct Modifications {
 
 struct CommitPath {
     /// Identifier of the commit object.
-    HashId id;
+    HashId id = HashId();
     /// Path of the entry in the commit.
     std::string path;
 };
