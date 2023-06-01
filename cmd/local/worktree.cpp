@@ -221,7 +221,7 @@ void WorkingTree::WriteBlob(const std::filesystem::path& path, const PathEntry& 
 
     if (entry.type == PathType::Executible || entry.type == PathType::File) {
         auto obj = odb_.Load(entry.id);
-
+        // Write blob.
         if (obj.Type() == DataType::Blob) {
             auto file = File::ForOverwrite(path);
             file.Write(obj.Data(), obj.Size());
@@ -232,18 +232,71 @@ void WorkingTree::WriteBlob(const std::filesystem::path& path, const PathEntry& 
                 file.Write(blob.Data(), blob.Size());
             }
         }
+        // Set executible bit.
+        if (entry.type == PathType::Executible) {
+            static constexpr std::filesystem::perms permissions =
+                std::filesystem::perms::owner_all | std::filesystem::perms::group_read
+                | std::filesystem::perms::group_exec | std::filesystem::perms::others_read
+                | std::filesystem::perms::others_exec;
+
+            std::filesystem::permissions(path, permissions);
+        }
     }
 }
 
-static bool
-CompareBlobEntry(const PathEntry& entry, const std::filesystem::directory_entry& de, const Datastore&) {
-    if (de.is_regular_file()) {
-        return entry.size == de.file_size();
-    } else if (de.is_symlink()) {
-        ;
+HashId CalculateFileHash(const std::filesystem::path& path) {
+    auto file = File::ForRead(path);
+    auto size = file.Size();
+    HashId::Builder builder;
+    char buf[8 << 10];
+    builder.Append(DataHeader::Make(DataType::Blob, size));
+    while (size > 0) {
+        if (const size_t read = file.Read(buf, std::min(size, sizeof(buf)))) {
+            builder.Append(buf, read);
+            size -= read;
+        } else {
+            throw std::runtime_error(fmt::format("unexpected end of file '{}'", path));
+        }
+    }
+    return builder.Build();
+}
+
+static Modifications CompareBlobEntry(
+    const PathEntry& entry, const std::filesystem::directory_entry& de, const Datastore& odb
+) {
+    const auto status = de.symlink_status();
+    Modifications result;
+
+    if (status.type() == std::filesystem::file_type::regular) {
+        result.type = entry.type == PathType::Symlink;
+        result.attributes =
+            (entry.type == PathType::Executible)
+            ^ ((status.permissions() & std::filesystem::perms::owner_exec) != std::filesystem::perms::none);
+
+        if (entry.size != de.file_size()) {
+            result.content = true;
+        } else {
+            const auto is_hash_mismatch = [&](const HashId& id) {
+                if (entry.id == id) {
+                    return false;
+                }
+                if (odb.GetType(entry.id) == DataType::Index) {
+                    return odb.LoadIndex(entry.id).Id() != id;
+                } else {
+                    return true;
+                }
+            };
+
+            result.content = is_hash_mismatch(CalculateFileHash(de.path()));
+        }
+    } else if (status.type() == std::filesystem::file_type::symlink) {
+        const std::string link = std::filesystem::read_symlink(de.path());
+
+        result.type = entry.type == PathType::File || entry.type == PathType::Executible;
+        result.content = link.size() != entry.size || HashId::Make(DataType::Blob, link) != entry.id;
     }
 
-    return true;
+    return result;
 }
 
 void WorkingTree::Status(const StatusOptions& options, const StageArea& stage, const StatusCallback& cb)
@@ -349,15 +402,13 @@ void WorkingTree::Status(const StatusOptions& options, const StageArea& stage, c
                                .SetType(path_type));
                     }
                 } else if (options.tracked) {
-                    if (CompareBlobEntry(*ei, entry, odb_)) {
-                        continue;
+                    if (const Modifications changes = CompareBlobEntry(*ei, entry, odb_)) {
+                        cb(PathStatus()
+                               .SetEntry(*ei)
+                               .SetPath(path)
+                               .SetStatus(PathStatus::Modified)
+                               .SetType(path_type));
                     }
-
-                    cb(PathStatus()
-                           .SetEntry(*ei)
-                           .SetPath(path)
-                           .SetStatus(PathStatus::Modified)
-                           .SetType(path_type));
                 }
             } else if (options.untracked != Expansion::None) {
                 cb(PathStatus().SetPath(path).SetStatus(PathStatus::Untracked).SetType(path_type));
