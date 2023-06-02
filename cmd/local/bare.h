@@ -9,6 +9,8 @@
 
 namespace Vcs {
 
+class Config;
+
 struct LogOptions {
     std::unordered_set<HashId> roots;
     std::unordered_set<HashId> hidden;
@@ -65,6 +67,8 @@ public:
 public:
     Repository(const std::filesystem::path& path);
 
+    ~Repository();
+
     /** Initalize a bare repository. */
     static void Initialize(const std::filesystem::path& path);
 
@@ -93,6 +97,16 @@ public:
      * Lists local branches.
      */
     void ListBranches(const std::function<void(const Branch& branch)>& cb) const;
+
+    /**@}*/
+
+public:
+    /**
+     * @name Configuration
+     * @{
+     */
+
+    const Config& GetConfig() const;
 
     /**@}*/
 
@@ -137,6 +151,8 @@ public:
 
 protected:
     std::filesystem::path bare_path_;
+    /// Configuration.
+    std::unique_ptr<Config> config_;
     /// Object storage.
     Datastore odb_;
     /// Local branches.

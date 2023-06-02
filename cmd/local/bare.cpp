@@ -1,4 +1,5 @@
 #include "bare.h"
+#include "config.h"
 #include "worktree.h"
 
 #include <vcs/changes/revwalk.h>
@@ -9,6 +10,18 @@
 #include <contrib/json/nlohmann.hpp>
 
 namespace Vcs {
+namespace {
+
+nlohmann::json GetDefaultConfig() {
+    return nlohmann::json::object({
+        // Coloring mode.
+        {"color", {{"ui", "auto"}}},
+        // Default pager.
+        {"core", {{"pager", ""}}},
+    });
+}
+
+} // namespace
 
 auto Repository::Branch::Load(const std::string_view data) -> Branch {
     auto json = nlohmann::json::parse(data);
@@ -43,13 +56,24 @@ auto Repository::Workspace::Save(const Workspace& rec) -> std::string {
 
 Repository::Repository(const std::filesystem::path& path)
     : bare_path_(path) {
+    // Open configs.
+    config_ = std::make_unique<Config>();
+    // Setup default configuration.
+    config_->Reset(ConfigLocation::Default, Config::MakeBackend(GetDefaultConfig()));
+    // Setup repository-level configuration.
+    config_->Reset(ConfigLocation::Repository, Config::MakeBackend(path / "config" / "config.json"));
+
     // Open object database.
     odb_ = Datastore::Make<Store::Loose>(path / "objects");
+
     // Open branch database.
     branches_ = std::make_unique<Database<Branch>>(path / "db" / "branches");
+
     // Open workspace database.
     workspaces_ = std::make_unique<Database<Workspace>>(path / "db" / "workspaces");
 }
+
+Repository::~Repository() = default;
 
 void Repository::Initialize(const std::filesystem::path& path) {
     std::filesystem::create_directories(path);
@@ -87,6 +111,10 @@ void Repository::ListBranches(const std::function<void(const Branch& branch)>& c
         cb(branch);
         return true;
     });
+}
+
+const Config& Repository::GetConfig() const {
+    return *config_;
 }
 
 void Repository::Log(

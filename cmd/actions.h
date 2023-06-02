@@ -13,6 +13,8 @@ enum class Action {
     Clean,
     /// Record changes to the repository.
     Commit,
+    /// Get or set repository or global options.
+    Config,
     /// Show changes between commits, commit and working tree, etc.
     Diff,
     /// Create an empty repository.
@@ -32,7 +34,9 @@ enum class Action {
     /// Mangage multiple working spaces.
     Workspace,
 
+    /// Dump various internal info.
     Dump,
+    /// Set of tools to interact with git repositories.
     Git,
 };
 

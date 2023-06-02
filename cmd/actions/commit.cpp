@@ -1,3 +1,4 @@
+#include <cmd/local/config.h>
 #include <cmd/local/workspace.h>
 #include <vcs/changes/path.h>
 #include <vcs/object/commit.h>
@@ -104,6 +105,15 @@ int ExecuteCommit(int argc, char* argv[], const std::function<Workspace&()>& cb)
                 options.paths.push_back(repo.ToTreePath(path));
             }
         }
+    }
+
+    if (!cb().GetConfig().Get("user.name")) {
+        fmt::print(stderr, "error: configuration value 'user.name' should be defined\n");
+        return 1;
+    }
+    if (!cb().GetConfig().Get("user.email")) {
+        fmt::print(stderr, "error: configuration value 'user.email' should be defined\n");
+        return 1;
     }
 
     return Execute(options, cb());

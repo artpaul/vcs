@@ -3,6 +3,7 @@ add_executable(libvcs3-ut)
 target_link_libraries(libvcs3-ut
     contrib-gtest
     libvcs3
+    vcs-local
 )
 
 target_sources(libvcs3-ut PRIVATE
@@ -16,6 +17,7 @@ target_sources(libvcs3-ut PRIVATE
 # Unit tests.
 target_sources(libvcs3-ut PRIVATE
     "ut_changelist.cpp"
+    "ut_config.cpp"
     "ut_data.cpp"
     "ut_hashid.cpp"
     "ut_object.cpp"

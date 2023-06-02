@@ -1,4 +1,5 @@
 #include "workspace.h"
+#include "config.h"
 #include "worktree.h"
 
 #include <vcs/changes/stage.h>
@@ -15,15 +16,20 @@ namespace Vcs {
 
 Workspace::Workspace(const std::filesystem::path& bare_path, const std::filesystem::path& work_path)
     : Repository(bare_path) {
-    working_tree_ = std::make_unique<WorkingTree>(work_path, odb_, [this]() {
-        return HashId::FromHex(StringFromFile(state_path_ / "TREE"));
-    });
-    // Lookup workspace.
+    // Lookup workspace settings.
     if (const auto& ws = workspaces_->Get(work_path.string())) {
         state_path_ = bare_path_ / "workspaces" / ws->name;
     } else {
         throw std::runtime_error(fmt::format("working tree {} is not registered", work_path));
     }
+
+    // Setup workspace-level configuration.
+    config_->Reset(ConfigLocation::Workspace, Config::MakeBackend(state_path_ / "config.json"));
+
+    // Working tree.
+    working_tree_ = std::make_unique<WorkingTree>(work_path, odb_, [this]() {
+        return HashId::FromHex(StringFromFile(state_path_ / "TREE"));
+    });
 }
 
 Workspace::~Workspace() = default;
@@ -73,6 +79,8 @@ HashId Workspace::Commit(const std::string& message, const std::vector<PathStatu
     builder.message = message;
     builder.tree = stage->SaveTree(odb_);
     // Author.
+    builder.author.name = config_->Get("user.name").value_or(nlohmann::json()).get<std::string>();
+    builder.author.id = config_->Get("user.email").value_or(nlohmann::json()).get<std::string>();
     builder.author.when = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
     // Committer.
     builder.committer = builder.author;

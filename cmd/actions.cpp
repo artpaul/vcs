@@ -9,6 +9,7 @@ static const std::unordered_map<std::string_view, Action> actions = {
     {"branch", Action::Branch},
     {"clean", Action::Clean},
     {"commit", Action::Commit},
+    {"config", Action::Config},
     {"diff", Action::Diff},
     {"init", Action::Init},
     {"log", Action::Log},

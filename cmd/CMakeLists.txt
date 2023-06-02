@@ -7,8 +7,9 @@ target_link_libraries(vcs-local
 )
 
 target_sources(vcs-local PRIVATE
-    "local/db.cpp"
     "local/bare.cpp"
+    "local/config.cpp"
+    "local/db.cpp"
     "local/workspace.cpp"
     "local/worktree.cpp"
 )
@@ -24,6 +25,7 @@ target_sources(vcs PRIVATE
     "actions.cpp"
     "actions/branch.cpp"
     "actions/commit.cpp"
+    "actions/config.cpp"
     "actions/diff.cpp"
     "actions/dump.cpp"
     "actions/git.cpp"
