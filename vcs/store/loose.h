@@ -21,7 +21,7 @@ public:
 
 public:
     explicit Loose(
-        const std::filesystem::path& path,
+        const std::filesystem::path path,
         const Options& options = Options{.codec = Compression::Lz4, .data_sync = true}
     );
 

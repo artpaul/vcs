@@ -173,5 +173,6 @@ private:
 
 /// Ensure Datastore is move constructible.
 static_assert(std::is_move_constructible_v<Datastore>);
+static_assert(std::is_move_assignable_v<Datastore>);
 
 } // namespace Vcs

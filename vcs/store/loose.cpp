@@ -79,11 +79,11 @@ std::filesystem::path MakePath(const std::filesystem::path& root, const HashId& 
 
 } // namespace
 
-Loose::Loose(const std::filesystem::path& path, const Options& options)
-    : path_(path)
+Loose::Loose(std::filesystem::path path, const Options& options)
+    : path_(std::move(path))
     , options_(options) {
     // Force directory existence.
-    std::filesystem::create_directories(path);
+    std::filesystem::create_directories(path_);
 }
 
 void Loose::Enumerate(bool with_metadata, const std::function<bool(const HashId&, const DataHeader)>& cb)
@@ -127,6 +127,7 @@ DataHeader Loose::GetMeta(const HashId& id) const try
         throw std::runtime_error("header data corruption");
     }
     return DataHeader::Make(hdr.Type(), hdr.Size());
+
 } catch (const std::system_error& e) {
     if (std::errc::file_exists == e.code()) {
         return DataHeader();
@@ -190,6 +191,7 @@ Object Loose::Load(const HashId& id, const DataType expected) const try
             }
         }
     });
+
 } catch (const std::system_error& e) {
     if (std::errc::file_exists == e.code()) {
         return Object();
