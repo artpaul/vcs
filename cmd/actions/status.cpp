@@ -27,6 +27,10 @@ void BranchInfo(const Options&, const Workspace& repo) {
             util::is_atty(stdout) ? fmt::fg(fmt::terminal_color::bright_magenta) : fmt::text_style()
         )
     );
+
+    if (!bool(branch.head)) {
+        fmt::print("\nNo commits yet\n");
+    }
 }
 
 void ChangesInfo(const Options& options, const Workspace& repo) {
