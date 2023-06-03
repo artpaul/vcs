@@ -33,15 +33,41 @@ int DumpObject(const Options& options, const Workspace& repo) {
     if (obj.Type() == DataType::Commit) {
         const auto commit = obj.AsCommit();
 
+        const auto date_string = [](const std::time_t ts) {
+            char buf[64];
+
+            return std::string(buf, std::strftime(buf, sizeof(buf), "%c %z", std::localtime(&ts)));
+        };
+
         fmt::print("commit {} {}\n", options.id, obj.Size());
         fmt::print("tree       {}\n", commit.Tree());
         fmt::print("generation {}\n", commit.Generation());
+        // Author.
+        if (const auto author = commit.Author()) {
+            fmt::print(
+                "author     {}{}\n", author.Name(),
+                author.Id().empty() ? "" : fmt::format(" <{}>", author.Id())
+            );
+        }
+        // Commiter.
+        if (const auto author = commit.Author()) {
+            fmt::print(
+                "commiter   {}{}\n", author.Name(),
+                author.Id().empty() ? "" : fmt::format(" <{}>", author.Id())
+            );
+        }
+        // Timestamp.
+        fmt::print("timestamp  {}\n", date_string(commit.Timestamp()));
         // Parents.
         for (const auto& p : commit.Parents()) {
             fmt::print("parent     {}\n", p);
         }
         // Message.
         fmt::print("message    {}\n", commit.Message());
+        // Attributes.
+        for (const auto attr : commit.Attributes()) {
+            fmt::print("{:<10} {}\n", attr.Name(), attr.Value());
+        }
 
         return 0;
     }

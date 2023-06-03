@@ -129,10 +129,6 @@ uint64_t Blob::Size() const noexcept {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-constexpr Commit::Attribute::Attribute(const void* p) noexcept
-    : p_(p) {
-}
-
 std::string_view Commit::Attribute::Name() const {
     if (const auto name = static_cast<const Fbs::Attribute*>(p_)->name()) {
         return std::string_view(name->data(), name->size());
@@ -145,10 +141,6 @@ std::string_view Commit::Attribute::Value() const {
         return std::string_view(value->data(), value->size());
     }
     return std::string_view();
-}
-
-constexpr Commit::Signature::Signature(const void* p) noexcept
-    : p_(p) {
 }
 
 std::string_view Commit::Signature::Name() const {
@@ -174,10 +166,6 @@ uint64_t Commit::Signature::When() const {
         return static_cast<const Fbs::Signature*>(p_)->when();
     }
     return 0;
-}
-
-constexpr Commit::Signature::operator bool() const noexcept {
-    return bool(p_);
 }
 
 Commit::Attribute Commit::RangeAttribute::Item(const void* p, size_t i) {
@@ -269,11 +257,6 @@ HashId Commit::Tree() const {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-constexpr Index::Part::Part(const void* p) noexcept
-    : p_(p) {
-    assert(p_);
-}
-
 HashId Index::Part::Id() const {
     if (const auto id = static_cast<const Fbs::Part*>(p_)->id()) {
         return HashId::FromBytes(id->data(), id->size());
@@ -324,11 +307,6 @@ RepeatedField<Index::Part, Index::RangeParts> Index::Parts() const {
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-constexpr Renames::CopyInfo::CopyInfo(const void* p, const size_t i) noexcept
-    : p_(p)
-    , i_(i) {
-}
 
 HashId Renames::CopyInfo::CommitId() const {
     const auto copy = Fbs::GetRenames(p_)->copies()->GetAs<Fbs::CopyInfo>(i_);
@@ -425,10 +403,6 @@ Renames::Renames(const std::shared_ptr<std::byte[]>& data) noexcept
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-constexpr Tree::Entry::Entry(const void* p) noexcept
-    : p_(p) {
-}
 
 HashId Tree::Entry::Id() const {
     if (const auto id = static_cast<const Fbs::TreeEntry*>(p_)->id()) {

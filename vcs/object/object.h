@@ -255,7 +255,9 @@ class Commit final : public ObjectBase<Commit> {
 public:
     class Attribute {
     public:
-        explicit constexpr Attribute(const void* p) noexcept;
+        explicit constexpr Attribute(const void* p) noexcept
+            : p_(p) {
+        }
 
         /// Name of the attribute.
         std::string_view Name() const;
@@ -269,15 +271,26 @@ public:
 
     class Signature {
     public:
-        explicit constexpr Signature(const void* p) noexcept;
+        explicit constexpr Signature(const void* p) noexcept
+            : p_(p) {
+        }
 
+        /// Unique user identifier (email, login, etc).
         std::string_view Id() const;
 
+        /// Human readable name.
         std::string_view Name() const;
 
+        /// Timestamp in UTC.
         uint64_t When() const;
 
-        explicit constexpr operator bool() const noexcept;
+        explicit constexpr operator bool() const noexcept {
+            return p_ != nullptr;
+        }
+
+        constexpr bool operator==(const Signature& other) const noexcept {
+            return p_ == other.p_;
+        }
 
     private:
         const void* const p_;
@@ -338,7 +351,9 @@ class Index final : public ObjectBase<Index> {
 public:
     class Part {
     public:
-        explicit constexpr Part(const void* p) noexcept;
+        explicit constexpr Part(const void* p) noexcept
+            : p_(p) {
+        }
 
         /// Identifier of the object.
         HashId Id() const;
@@ -383,7 +398,10 @@ class Renames final : public ObjectBase<Renames> {
 public:
     class CopyInfo {
     public:
-        explicit constexpr CopyInfo(const void* p, const size_t i) noexcept;
+        constexpr CopyInfo(const void* p, const size_t i) noexcept
+            : p_(p)
+            , i_(i) {
+        }
 
         /// Source revision.
         HashId CommitId() const;
@@ -441,7 +459,9 @@ class Tree final : public ObjectBase<Tree> {
 public:
     class Entry {
     public:
-        explicit constexpr Entry(const void* p) noexcept;
+        explicit constexpr Entry(const void* p) noexcept
+            : p_(p) {
+        }
 
         /// Identifier of an object.
         HashId Id() const;

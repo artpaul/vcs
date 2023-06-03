@@ -96,7 +96,7 @@ void ChangesInfo(const Options& options, const Workspace& repo) {
         }
     }
 
-    if (untracked.size()) {
+    if (tracked.size() || untracked.size()) {
         fmt::print("\n");
     }
 }

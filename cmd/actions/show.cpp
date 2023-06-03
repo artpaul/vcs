@@ -43,16 +43,31 @@ int ShowCommit(const Options& options, const Commit& commit, const Datastore& od
         return std::string(buf, std::strftime(buf, sizeof(buf), "%c %z", std::localtime(&ts)));
     };
 
+    const auto author = commit.Author();
+    const auto committer = commit.Committer();
+
     // Header.
     fmt::print("{}\n", fmt::styled(fmt::format("commit {}", options.id), head_style()));
     // Author.
-    fmt::print(
-        "Author: {}{}\n",
-        //
-        commit.Author().Name(),
-        //
-        commit.Author().Id().empty() ? "" : fmt::format(" <{}>", commit.Author().Id())
-    );
+    if (author) {
+        fmt::print(
+            "Author: {}{}\n",
+            // Name.
+            author.Name(),
+            // Login or email.
+            author.Id().empty() ? "" : fmt::format(" <{}>", author.Id())
+        );
+    }
+    // Committer.
+    if (committer && author != committer) {
+        fmt::print(
+            "Committer: {}{}\n",
+            // Name.
+            committer.Name(),
+            // Login or email.
+            committer.Id().empty() ? "" : fmt::format(" <{}>", committer.Id())
+        );
+    }
     // Date.
     fmt::print("Date:   {}\n", date_string(commit.Timestamp()));
     // Message.

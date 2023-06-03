@@ -38,7 +38,7 @@ std::string CommitBuilder::Serialize() {
     Offset<Vector<Offset<Fbs::Attribute>>> attributes = 0;
     Offset<Fbs::Signature> author = this->author ? save_signature(this->author) : 0;
     Offset<Fbs::Signature> committer =
-        (this->committer || this->author != this->committer) ? save_signature(this->committer) : 0;
+        (this->committer && this->author != this->committer) ? save_signature(this->committer) : 0;
     Offset<String> message = this->message.empty() ? 0 : fbb.CreateString(this->message);
     Offset<Vector<uint8_t>> tree = fbb.CreateVector(this->tree.Data(), this->tree.Size());
     Offset<Vector<uint8_t>> parents = 0;
