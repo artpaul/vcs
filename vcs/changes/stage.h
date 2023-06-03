@@ -82,7 +82,9 @@ private:
 
     Directory* MutableRoot();
 
-    HashId SaveTreeImpl(const Directory* root, Datastore odb, bool save_empty_directory) const;
+    std::pair<HashId, DataType> SaveTreeImpl(
+        const Directory* root, Datastore odb, bool save_empty_directory
+    ) const;
 
 private:
     const Datastore& odb_;

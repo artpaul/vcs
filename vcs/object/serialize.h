@@ -19,8 +19,8 @@ public:
         /// Value of the attribute.
         std::string value;
 
-        constexpr bool Empty() const noexcept {
-            return name.empty();
+        constexpr explicit operator bool() const noexcept {
+            return name.size();
         }
     };
 
@@ -32,8 +32,12 @@ public:
         /// Creation timestamp in UTC.
         uint64_t when = 0;
 
-        constexpr bool Empty() const noexcept {
-            return id.empty() && name.empty() && when == 0;
+        constexpr explicit operator bool() const noexcept {
+            return id.size() || name.size() || when != 0;
+        }
+
+        constexpr bool operator==(const Signature& other) const noexcept {
+            return std::make_tuple(id, name, when) == std::make_tuple(other.id, other.name, other.when);
         }
     };
 
@@ -107,8 +111,8 @@ public:
         /// Target path.
         std::string path;
 
-        bool IsEmpty() const noexcept {
-            return path.empty() || source.empty() || !bool(commit);
+        constexpr explicit operator bool() const noexcept {
+            return path.size() && source.size() && bool(commit);
         }
     };
 

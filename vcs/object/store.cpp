@@ -201,10 +201,10 @@ Tree Datastore::LoadTree(const HashId& id) const {
     }
 }
 
-HashId Datastore::Put(const DataType type, const std::string_view content) {
+std::pair<HashId, DataType> Datastore::Put(const DataType type, const std::string_view content) {
     // The data is small enough to be saved as single object.
     if (impl_->ChunkSize() >= content.size()) {
-        return impl_->Put(type, content);
+        return std::make_pair(impl_->Put(type, content), type);
     }
 
     IndexBuilder builder(HashId::Make(type, content), type);
@@ -220,10 +220,10 @@ HashId Datastore::Put(const DataType type, const std::string_view content) {
     }
 
     // Save index.
-    return impl_->Put(DataType::Index, builder.Serialize());
+    return std::make_pair(impl_->Put(DataType::Index, builder.Serialize()), DataType::Index);
 }
 
-HashId Datastore::Put(const DataHeader meta, InputStream input) {
+std::pair<HashId, DataType> Datastore::Put(const DataHeader meta, InputStream input) {
     const auto put_single_object =
         [this](const DataHeader meta, InputStream& input, HashId::Builder* hasher) {
             auto buf = std::make_unique_for_overwrite<char[]>(meta.Size());
@@ -245,7 +245,7 @@ HashId Datastore::Put(const DataHeader meta, InputStream input) {
 
     // The data is small enough to be saved as single object.
     if (impl_->ChunkSize() >= meta.Size()) {
-        return put_single_object(meta, input, nullptr);
+        return std::make_pair(put_single_object(meta, input, nullptr), meta.Type());
     }
 
     HashId::Builder hasher;
@@ -264,7 +264,7 @@ HashId Datastore::Put(const DataHeader meta, InputStream input) {
     index.SetId(hasher.Build());
 
     // Save index.
-    return impl_->Put(DataType::Index, index.Serialize());
+    return std::make_pair(impl_->Put(DataType::Index, index.Serialize()), DataType::Index);
 }
 
 } // namespace Vcs

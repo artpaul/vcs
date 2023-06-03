@@ -15,7 +15,7 @@ std::string CommitBuilder::Serialize() {
     assert(this->tree);
     assert(this->generation > 0);
 
-    auto saveSignature = [&](const Signature& sig) {
+    const auto save_signature = [&](const Signature& sig) {
         Offset<String> name = 0;
         Offset<String> id = 0;
         if (!sig.name.empty()) {
@@ -31,9 +31,14 @@ std::string CommitBuilder::Serialize() {
         return builder.Finish();
     };
 
+    if (!bool(this->author)) {
+        this->author = this->committer;
+    }
+
     Offset<Vector<Offset<Fbs::Attribute>>> attributes = 0;
-    Offset<Fbs::Signature> author = this->author.Empty() ? 0 : saveSignature(this->author);
-    Offset<Fbs::Signature> committer = this->committer.Empty() ? 0 : saveSignature(this->committer);
+    Offset<Fbs::Signature> author = this->author ? save_signature(this->author) : 0;
+    Offset<Fbs::Signature> committer =
+        (this->committer || this->author != this->committer) ? save_signature(this->committer) : 0;
     Offset<String> message = this->message.empty() ? 0 : fbb.CreateString(this->message);
     Offset<Vector<uint8_t>> tree = fbb.CreateVector(this->tree.Data(), this->tree.Size());
     Offset<Vector<uint8_t>> parents = 0;
@@ -56,7 +61,7 @@ std::string CommitBuilder::Serialize() {
 
         std::vector<Offset<Fbs::Attribute>> tmp;
         for (const auto& attr : this->attributes) {
-            if (attr.Empty()) {
+            if (!bool(attr)) {
                 continue;
             }
             const auto name = fbb.CreateString(attr.name);
@@ -213,7 +218,7 @@ TreeBuilder& TreeBuilder::Append(const Tree::Entry& entry) {
         // Name.
         entry.Name(),
         // Attributes.
-        PathEntry{.id = entry.Id(), .type = entry.Type(), .size = entry.Size()}
+        PathEntry{.id = entry.Id(), .data = entry.Data(), .type = entry.Type(), .size = entry.Size()}
     );
     return *this;
 }
@@ -253,6 +258,7 @@ std::string TreeBuilder::Serialize() {
         Fbs::TreeEntryBuilder builder(fbb);
 
         builder.add_id(id);
+        builder.add_data(Fbs::DataType(entry.data));
         builder.add_type(Fbs::PathType(entry.type));
         builder.add_name(name);
         builder.add_size(entry.size);

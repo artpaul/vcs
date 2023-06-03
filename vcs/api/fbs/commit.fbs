@@ -3,13 +3,11 @@ include "types.fbs";
 namespace Fbs;
 
 table Commit {
-    /// List of user defined attributes sorted by name.
-    attributes:[Attribute];
-
     /// Author.
-    author:Signature;
+    author:Signature (required);
 
     /// Commiter.
+    /// Empty if equal to the author.
     committer:Signature;
 
     /// Commit message.
@@ -26,6 +24,9 @@ table Commit {
 
     /// Id of an object with history adjustments for the root tree.
     renames:[ubyte];
+
+    /// List of user defined attributes sorted by name.
+    attributes:[Attribute];
 }
 
 root_type Commit;

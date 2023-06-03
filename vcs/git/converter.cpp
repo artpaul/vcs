@@ -123,7 +123,8 @@ private:
 
         // Save blob content.
         entry.size = git_blob_rawsize(blob.get());
-        entry.id = odb_.Put(
+        // Storage key.
+        std::tie(entry.id, entry.data) = odb_.Put(
             DataType::Blob,
             std::string_view(
                 reinterpret_cast<const char*>(git_blob_rawcontent(blob.get())), git_blob_rawsize(blob.get())
@@ -333,7 +334,7 @@ HashId Converter::Impl::ConvertCommit(const HashId& id, Datastore odb) {
             });
         }
 
-        builder.renames = odb.Put(DataType::Renames, renames.Serialize());
+        builder.renames = odb.Put(DataType::Renames, renames.Serialize()).first;
     }
 
     //
@@ -350,7 +351,7 @@ HashId Converter::Impl::ConvertCommit(const HashId& id, Datastore odb) {
         throw std::runtime_error("inconsistent commit object");
     }
     // Save to databaes.
-    return stage_odb.Put(DataType::Commit, content);
+    return stage_odb.Put(DataType::Commit, content).first;
 }
 
 void Converter::Impl::ListCommits(

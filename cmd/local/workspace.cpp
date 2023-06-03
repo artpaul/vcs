@@ -92,7 +92,7 @@ HashId Workspace::Commit(const std::string& message, const std::vector<PathStatu
     builder.generation = 1 + GetLargestGeneration(builder, odb_);
 
     // Store commit object.
-    const HashId id = odb_.Put(DataType::Commit, builder.Serialize());
+    const auto [id, _] = odb_.Put(DataType::Commit, builder.Serialize());
 
     // Reset stage.
     stage_.reset();

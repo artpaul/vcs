@@ -43,7 +43,7 @@ TEST(Datastore, Cache) {
     // Setup datastore.
     auto odb = Datastore().Chain(mem1).Chain(mem2).Cache(mem3);
     // Put blob directly into the first backend.
-    auto id = Datastore().Chain(mem1).Put(DataType::Blob, text);
+    auto [id, _] = Datastore().Chain(mem1).Put(DataType::Blob, text);
 
     ASSERT_EQ(odb.LoadBlob(id), text);
 
@@ -65,7 +65,7 @@ TEST(Datastore, InputStream) {
         data.append(text);
     }
 
-    auto id = odb.Put(DataHeader::Make(DataType::Blob, data.size()), InputStream(stream));
+    auto [id, _] = odb.Put(DataHeader::Make(DataType::Blob, data.size()), InputStream(stream));
 
     ASSERT_TRUE(id);
     // Check validity of metadata.
@@ -139,7 +139,7 @@ TEST(MemoryCache, BlobChunked) {
 
     {
         auto mem = Datastore(1u << 20).Chain<Store::MemoryCache>(4u << 20);
-        const auto id = mem.Put(DataType::Blob, content);
+        const auto [id, _] = mem.Put(DataType::Blob, content);
 
         ASSERT_TRUE(mem.IsExists(id));
         ASSERT_EQ(mem.GetType(id), DataType::Blob);
@@ -148,9 +148,10 @@ TEST(MemoryCache, BlobChunked) {
 
     {
         auto mem = Datastore(1024).Chain<Store::MemoryCache>(1u << 20);
-        const auto id = mem.Put(DataType::Blob, content);
+        const auto [id, type] = mem.Put(DataType::Blob, content);
 
         ASSERT_TRUE(mem.IsExists(id));
+        ASSERT_EQ(type, DataType::Index);
         ASSERT_EQ(mem.GetType(id), DataType::Index);
         EXPECT_EQ(mem.LoadIndex(id).Type(), DataType::Blob);
         EXPECT_EQ(mem.LoadIndex(id).Size(), content.size());
@@ -169,7 +170,7 @@ TEST(MemoryCache, TreeChunked) {
     }
 
     auto mem = Datastore(1024).Chain<Store::MemoryCache>(1u << 20);
-    const auto id = mem.Put(DataType::Tree, builder.Serialize());
+    const auto [id, _] = mem.Put(DataType::Tree, builder.Serialize());
 
     ASSERT_TRUE(mem.IsExists(id));
     ASSERT_EQ(mem.GetType(id), DataType::Index);

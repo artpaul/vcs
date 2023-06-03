@@ -8,8 +8,11 @@
 using namespace Vcs;
 
 static PathEntry MakeBlob(const std::string_view content, Datastore odb) {
+    const auto [id, type] = odb.Put(DataType::Blob, content);
+
     return PathEntry{
-        .id = odb.Put(DataType::Blob, content),
+        .id = id,
+        .data = type,
         .type = PathType::File,
         .size = content.size(),
     };

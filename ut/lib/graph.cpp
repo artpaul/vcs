@@ -8,7 +8,7 @@ namespace Vcs::UT {
 
 Graph::Graph(Datastore odb)
     : odb_(odb) {
-    tree_id_ = odb_.Put(DataType::Tree, TreeBuilder().Serialize());
+    tree_id_ = odb_.Put(DataType::Tree, TreeBuilder().Serialize()).first;
 }
 
 HashId Graph::GetHashId(const KeyId id) const noexcept {
@@ -40,12 +40,14 @@ HashId Graph::MakeCommit(
     commit.message = std::to_string(key);
     commit.tree = tree_id.value_or(tree_id_);
     commit.generation = 1 + GetLargestGeneration(commit, odb_);
+    commit.author.name = "John";
+    commit.author.when = commit_ids_.size();
 
     const auto& data = commit.Serialize();
     if (!CheckConsistency(Object::Load(DataType::Commit, data), odb_)) {
         throw std::runtime_error("inconsistent commit object");
     }
-    HashId id = odb_.Put(DataType::Commit, data);
+    HashId id = odb_.Put(DataType::Commit, data).first;
     commit_ids_.emplace(key, id);
     return id;
 }

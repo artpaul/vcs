@@ -217,7 +217,13 @@ Commit::Signature Commit::Author() const {
 }
 
 Commit::Signature Commit::Committer() const {
-    return Signature(Fbs::GetCommit(Adaptor::GetData(data_.get()))->committer());
+    const auto commit = Fbs::GetCommit(Adaptor::GetData(data_.get()));
+
+    if (const auto commiter = commit->committer()) {
+        return Signature(commiter);
+    } else {
+        return Signature(commit->author());
+    }
 }
 
 uint64_t Commit::Generation() const {
@@ -429,6 +435,10 @@ HashId Tree::Entry::Id() const {
         return HashId::FromBytes(id->data(), id->size());
     }
     return HashId();
+}
+
+DataType Tree::Entry::Data() const {
+    return DataType(static_cast<const Fbs::TreeEntry*>(p_)->data());
 }
 
 std::string_view Tree::Entry::Name() const {

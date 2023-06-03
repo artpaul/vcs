@@ -150,7 +150,7 @@ public:
      * @param type type of data object.
      * @param content raw content of data object.
      */
-    HashId Put(const DataType type, const std::string_view content);
+    std::pair<HashId, DataType> Put(const DataType type, const std::string_view content);
 
     /**
      * Puts an object into the datastore.
@@ -158,7 +158,7 @@ public:
      * @param meta type and size of data object.
      * @param input input stream which provides content of data object.
      */
-    HashId Put(const DataHeader meta, InputStream input);
+    std::pair<HashId, DataType> Put(const DataHeader meta, InputStream input);
 
     /**@}*/
 

@@ -3,9 +3,6 @@ include "types.fbs";
 namespace Fbs;
 
 table Tag {
-    /// List of user defined attributes sorted by name.
-    attributes:[Attribute];
-
     /// Description of the tag.
     message:string;
 
@@ -17,6 +14,9 @@ table Tag {
 
     /// Identifier of a tagged object.
     object:[ubyte] (required);
+
+    /// List of user defined attributes sorted by name.
+    attributes:[Attribute];
 }
 
 root_type Tag;

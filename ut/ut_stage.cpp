@@ -7,8 +7,11 @@
 using namespace Vcs;
 
 static PathEntry MakeBlob(const std::string_view content, Datastore* odb) {
+    const auto [id, type] = odb->Put(DataType::Blob, content);
+
     return PathEntry{
-        .id = odb->Put(DataType::Blob, content),
+        .id = id,
+        .data = type,
         .type = PathType::File,
         .size = content.size(),
     };
@@ -202,6 +205,8 @@ TEST(StageArea, SaveTreeUpdate) {
     StageArea index(mem, tree_id);
 
     ASSERT_TRUE(index.GetEntry("empty"));
+    EXPECT_EQ(index.GetEntry("empty")->data, DataType::Tree);
+    EXPECT_EQ(index.GetEntry("test")->data, DataType::Blob);
     EXPECT_TRUE(IsDirectory(index.GetEntry("empty")->type));
     EXPECT_TRUE(index.GetEntry("lib/test/empty"));
     EXPECT_FALSE(index.GetEntry("lib/test.h"));
@@ -209,17 +214,29 @@ TEST(StageArea, SaveTreeUpdate) {
 
 TEST(StageArea, SaveTreeChunked) {
     auto mem = Datastore(1024).Chain<Store::MemoryCache>(1u << 20);
-    StageArea index(mem);
-    const auto blob = MakeBlob("int test();", &mem);
+    HashId tree_id;
 
-    for (size_t i = 0; i < 100; ++i) {
-        ASSERT_TRUE(index.Add("name" + std::to_string(i), blob));
+    {
+        StageArea index(mem);
+        const auto blob = MakeBlob("int test();", &mem);
+
+        for (size_t i = 0; i < 50; ++i) {
+            ASSERT_TRUE(index.Add("name" + std::to_string(i), blob));
+            ASSERT_TRUE(index.Add("dir/name" + std::to_string(i), blob));
+        }
+
+        tree_id = index.SaveTree(mem);
     }
 
-    const auto id = index.SaveTree(mem);
+    ASSERT_TRUE(tree_id);
 
-    EXPECT_EQ(mem.GetType(id), DataType::Index);
-    EXPECT_EQ(mem.GetType(id, true), DataType::Tree);
+    StageArea index(mem, tree_id);
 
-    ASSERT_EQ(mem.LoadTree(id).Entries().size(), 100u);
+    EXPECT_EQ(mem.GetType(tree_id), DataType::Index);
+    EXPECT_EQ(mem.GetType(tree_id, true), DataType::Tree);
+
+    ASSERT_EQ(mem.LoadTree(tree_id).Entries().size(), 51u);
+
+    ASSERT_TRUE(index.GetEntry("dir"));
+    ASSERT_EQ(index.GetEntry("dir")->data, DataType::Index);
 }

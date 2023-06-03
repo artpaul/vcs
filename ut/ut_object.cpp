@@ -44,6 +44,7 @@ TEST(Object, Load) {
 
 TEST(ObjectCommit, Parents) {
     CommitBuilder commit;
+    commit.author.name = "John";
     commit.tree = HashId::Make(DataType::Tree, TreeBuilder().Serialize());
     commit.generation = 1;
     commit.parents.push_back(HashId());
@@ -58,9 +59,10 @@ TEST(ObjectCommit, Parents) {
 
 TEST(ObjectCommit, Serialize) {
     CommitBuilder commit;
+    commit.author.name = "John";
+    commit.author.when = 1;
     commit.tree = HashId::Make(DataType::Tree, TreeBuilder().Serialize());
     commit.generation = 1;
-    commit.committer.when = 1;
     commit.message = "test";
 
     auto data = commit.Serialize();
@@ -68,7 +70,7 @@ TEST(ObjectCommit, Serialize) {
 
     EXPECT_EQ(FromFlatBuffers(item->tree()).ToHex(), commit.tree.ToHex());
     EXPECT_EQ(item->generation(), 1u);
-    EXPECT_EQ(item->committer()->when(), 1u);
+    EXPECT_EQ(item->author()->when(), 1u);
     EXPECT_EQ(item->message()->str(), "test");
 }
 

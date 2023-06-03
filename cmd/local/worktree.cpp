@@ -87,18 +87,22 @@ std::optional<PathEntry> WorkingTree::MakeBlob(const std::string& path, Datastor
         case std::filesystem::file_type::regular: {
             auto f = File::ForRead(file_path, false);
             auto size = f.Size();
+            auto [id, type] = odb.Put(DataHeader::Make(DataType::Blob, size), InputStream(f));
 
             return PathEntry{
-                .id = odb.Put(DataHeader::Make(DataType::Blob, size), InputStream(f)),
+                .id = id,
+                .data = type,
                 .type = PathType::File,
                 .size = size,
             };
         }
         case std::filesystem::file_type::symlink: {
             const std::string link = std::filesystem::read_symlink(file_path);
+            const auto [id, type] = odb.Put(DataType::Blob, link);
 
             return PathEntry{
-                .id = odb.Put(DataType::Blob, link),
+                .id = id,
+                .data = type,
                 .type = PathType::Symlink,
                 .size = link.size(),
             };
@@ -244,7 +248,7 @@ void WorkingTree::WriteBlob(const std::filesystem::path& path, const PathEntry& 
     }
 }
 
-HashId CalculateFileHash(const std::filesystem::path& path) {
+static HashId CalculateFileHash(const std::filesystem::path& path) {
     auto file = File::ForRead(path);
     auto size = file.Size();
     HashId::Builder builder;
@@ -277,13 +281,10 @@ static Modifications CompareBlobEntry(
             result.content = true;
         } else {
             const auto is_hash_mismatch = [&](const HashId& id) {
-                if (entry.id == id) {
-                    return false;
-                }
-                if (odb.GetType(entry.id) == DataType::Index) {
+                if (entry.data == DataType::Index) {
                     return odb.LoadIndex(entry.id).Id() != id;
                 } else {
-                    return true;
+                    return entry.id != id;
                 }
             };
 

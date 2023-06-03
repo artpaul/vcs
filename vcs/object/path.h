@@ -34,6 +34,8 @@ enum class PathType : uint8_t {
 struct PathEntry {
     /// Identifier of the object.
     HashId id{};
+    /// Storage type of the object.
+    DataType data{DataType::None};
     /// Type of the entry.
     PathType type{PathType::File};
     /// Size of the object.

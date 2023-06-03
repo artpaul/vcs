@@ -62,8 +62,7 @@ public:
     static constexpr bool is_noexcept_item =
         std::is_nothrow_invocable_v<decltype(&A::Item), const P*, size_t>;
 
-    static constexpr bool is_noexcept_size =
-        std::is_nothrow_invocable_v<decltype(&A::Size), const P*>;
+    static constexpr bool is_noexcept_size = std::is_nothrow_invocable_v<decltype(&A::Size), const P*>;
 
     class iterator {
     public:
@@ -446,6 +445,9 @@ public:
 
         /// Identifier of an object.
         HashId Id() const;
+
+        /// Storage type of the object.
+        DataType Data() const;
 
         /// Entry's name.
         std::string_view Name() const;
