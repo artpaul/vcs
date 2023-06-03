@@ -1,5 +1,6 @@
 #include <util/arena.h>
 #include <util/split.h>
+#include <util/varint.h>
 
 #include <contrib/gtest/gtest.h>
 
@@ -25,4 +26,13 @@ TEST(Utils, SplitPath) {
     check_abc(SplitPath("a/b/c"));
     check_abc(SplitPath("/a/b/c"));
     check_abc(SplitPath("/a//b/c/"));
+}
+
+TEST(Utils, Varlen) {
+    uint8_t buf[10];
+    uint32_t val = 0;
+
+    ASSERT_EQ(EncodeVarint(100, buf, sizeof(buf)), 1u);
+    ASSERT_TRUE(DecodeVarint(buf, sizeof(buf), val));
+    EXPECT_EQ(val, 100u);
 }
