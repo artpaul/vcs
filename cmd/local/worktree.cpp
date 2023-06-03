@@ -141,6 +141,9 @@ void WorkingTree::Checkout(const std::string& p, const PathEntry& entry) {
     const auto path = path_ / p;
 
     if (IsDirectory(entry.type)) {
+        // Ensure directory exists.
+        CreateDirectory(p);
+
         MakeTree(path, odb_.LoadTree(entry.id));
     } else {
         const auto status = std::filesystem::symlink_status(path);

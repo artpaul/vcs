@@ -91,8 +91,12 @@ void Repository::Initialize(const std::filesystem::path& path) {
     std::make_unique<Database<Workspace>>(path / "db" / "workspaces").reset(nullptr);
 }
 
-void Repository::CreateBranch(const std::string& name, const HashId head) {
-    branches_->Put(name, Branch{.name = name, .head = head});
+Repository::Branch Repository::CreateBranch(const std::string& name, const HashId head) {
+    auto branch = Branch{.name = name, .head = head};
+
+    branches_->Put(name, branch);
+
+    return branch;
 }
 
 void Repository::DeleteBranch(const std::string& name) {

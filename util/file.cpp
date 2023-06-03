@@ -124,6 +124,7 @@ size_t File::Write(const void* buf, size_t len) {
 
 size_t File::Size() const {
     struct stat buf { };
+
     if (int ret = ::fstat(fd_, &buf); ret < 0) {
         throw std::system_error(errno, std::system_category(), "cannot get file stat");
     } else {
@@ -139,7 +140,7 @@ void StringToFile(const std::filesystem::path& path, const std::string_view valu
     }
 }
 
-std::string StringFromFile(const std::filesystem::path& path) {
+std::string StringFromFile(const std::filesystem::path& path, bool stripped) {
     auto file = File::ForRead(path);
     std::string result;
 
@@ -149,6 +150,12 @@ std::string StringFromFile(const std::filesystem::path& path) {
 
     while (size_t read = file.Read(buf, sizeof(buf))) {
         result.append(buf, read);
+    }
+
+    if (stripped) {
+        while (result.size() && std::isspace(result.back())) {
+            result.pop_back();
+        }
     }
 
     return result;

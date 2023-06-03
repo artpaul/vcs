@@ -81,7 +81,7 @@ public:
     /**
      * Creates a branch which will be point to the given commit.
      */
-    void CreateBranch(const std::string& name, const HashId head);
+    Branch CreateBranch(const std::string& name, const HashId head);
 
     /**
      * Deletes a branch.

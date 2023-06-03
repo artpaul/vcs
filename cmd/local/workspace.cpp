@@ -28,14 +28,14 @@ Workspace::Workspace(const std::filesystem::path& bare_path, const std::filesyst
 
     // Working tree.
     working_tree_ = std::make_unique<WorkingTree>(work_path, odb_, [this]() {
-        return HashId::FromHex(StringFromFile(state_path_ / "TREE"));
+        return HashId::FromHex(StringFromFile(state_path_ / "TREE", true));
     });
 }
 
 Workspace::~Workspace() = default;
 
 auto Workspace::GetCurrentBranch() const -> Branch {
-    if (auto branch = branches_->Get(StringFromFile(state_path_ / "HEAD"))) {
+    if (auto branch = branches_->Get(StringFromFile(state_path_ / "HEAD", true))) {
         return *branch;
     }
     return Branch();
@@ -96,11 +96,11 @@ HashId Workspace::Commit(const std::string& message, const std::vector<PathStatu
 
     // Reset stage.
     stage_.reset();
+    // Update base of working tree.
+    StringToFile(state_path_ / "TREE", builder.tree.ToHex());
     // Update head of the branch.
     branch.head = id;
     branches_->Put(branch.name, branch);
-    // Update base of working tree.
-    StringToFile(state_path_ / "TREE", builder.tree.ToHex());
 
     return id;
 }

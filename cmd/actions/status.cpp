@@ -89,7 +89,7 @@ void ChangesInfo(const Options& options, const Workspace& repo) {
     }
     if (untracked.size()) {
         fmt::print("\nUntracked files:\n");
-        fmt::print("  (use \"vcs add <file>...\" if you want to track changes to file)\n");
+        fmt::print("  (use \"vcs commit <file>...\" if you want to track changes to file)\n");
 
         for (const auto& status : untracked) {
             fmt::print("\t{}{}\n", status.path, (status.type == PathType::Directory ? "/" : ""));

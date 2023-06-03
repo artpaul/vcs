@@ -65,4 +65,4 @@ private:
 
 void StringToFile(const std::filesystem::path& path, const std::string_view value);
 
-std::string StringFromFile(const std::filesystem::path& path);
+std::string StringFromFile(const std::filesystem::path& path, bool stripped = false);

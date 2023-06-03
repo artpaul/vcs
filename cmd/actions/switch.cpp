@@ -33,16 +33,25 @@ struct Options {
 };
 
 int Execute(const Options& options, Workspace& repo) {
-    const auto target = repo.GetBranch(options.branch_name);
+    auto target = repo.GetBranch(options.branch_name);
 
     // Target branch should exist or be requested for creation.
     if (!bool(target)) {
         if (options.create) {
+            if (options.dry_run) {
+                fmt::print("dry run: branch '{}' will be chreate\n", options.branch_name);
+                return 0;
+            }
             // Create a reference.
-            repo.CreateBranch(options.branch_name, options.id ? *options.id : repo.GetCurrentHead());
-            // Update HEAD.
-            repo.SetCurrentBranch(options.branch_name);
-            return 0;
+            target =
+                repo.CreateBranch(options.branch_name, options.id ? *options.id : repo.GetCurrentHead());
+            // Just update HEAD if the current commit was not changed.
+            if (!options.id || *options.id == repo.GetCurrentHead()) {
+                repo.SetCurrentBranch(options.branch_name);
+
+                fmt::print("Switched to branch '{}'\n", options.branch_name);
+                return 0;
+            }
         } else {
             fmt::print(stderr, "error: unknown branch '{}'\n", options.branch_name);
             return 1;
@@ -137,6 +146,7 @@ int ExecuteSwitch(int argc, char* argv[], const std::function<Workspace&()>& cb)
             {
                 {"h,help", "print help"},
                 {"n,dry-run", "dry run", cxxopts::value(options.dry_run)},
+                {"c,create", "create and switch to a new branch", cxxopts::value(options.create)},
                 {"branch", "branch name", cxxopts::value(options.branch_name)},
                 {"commit", "commit id", cxxopts::value<std::string>()},
             }
