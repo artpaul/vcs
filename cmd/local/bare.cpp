@@ -170,8 +170,6 @@ bool Repository::CreateWorkspace(const Workspace& params, bool checkout) {
 
     // Write head.
     StringToFile(state_path / "HEAD", params.branch);
-    // Write base tree.
-    StringToFile(state_path / "TREE", tree.ToHex());
 
     // Create working tree path.
     std::filesystem::create_directories(params.path);
@@ -191,7 +189,10 @@ std::optional<Repository::Workspace> Repository::GetWorkspace(const std::string&
         const auto state_path = bare_path_ / "workspaces" / ws->name;
 
         ws->branch = StringFromFile(state_path / "HEAD");
-        ws->tree = HashId::FromHex(StringFromFile(state_path / "TREE"));
+
+        if (const auto branch = branches_->Get(ws->branch)) {
+            ws->tree = branch->head ? odb_.LoadCommit(branch->head).Tree() : HashId();
+        }
 
         return ws;
     }
