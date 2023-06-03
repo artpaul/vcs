@@ -15,6 +15,7 @@ extern int ExecuteDump(int argc, char* argv[], const std::function<Workspace&()>
 extern int ExecuteGit(int argc, char* argv[]);
 extern int ExecuteInit(int argc, char* argv[]);
 extern int ExecuteLog(int argc, char* argv[], const std::function<Workspace&()>& cb);
+extern int ExecuteReset(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteRestore(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteShow(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteStatus(int argc, char* argv[], const std::function<Workspace&()>& cb);
@@ -58,7 +59,7 @@ static int Main(int argc, char* argv[]) {
                 path = path.parent_path();
             } else {
                 fmt::print(
-                    stderr, "error: no repository in the curren directory or in any parent directory\n"
+                    stderr, "error: no repository in the current directory or in any parent directory\n"
                 );
                 std::exit(EXIT_FAILURE);
             }
@@ -91,6 +92,8 @@ static int Main(int argc, char* argv[]) {
             return ExecuteLog(argc - 1, argv + 1, get_workspace);
         case Action::Remove:
             break;
+        case Action::Reset:
+            return ExecuteReset(argc - 1, argv + 1, get_workspace);
         case Action::Restore:
             return ExecuteRestore(argc - 1, argv + 1, get_workspace);
         case Action::Show:
@@ -102,6 +105,7 @@ static int Main(int argc, char* argv[]) {
         case Action::Workspace:
             break;
         case Action::Unknown:
+            fmt::print(stderr, "error: unknown command '{}'\n", argv[1]);
             return 1;
     }
 

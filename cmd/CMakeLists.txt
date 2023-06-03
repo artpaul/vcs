@@ -31,6 +31,7 @@ target_sources(vcs PRIVATE
     "actions/git.cpp"
     "actions/init.cpp"
     "actions/log.cpp"
+    "actions/reset.cpp"
     "actions/restore.cpp"
     "actions/show.cpp"
     "actions/status.cpp"

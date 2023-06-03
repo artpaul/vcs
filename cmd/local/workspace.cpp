@@ -105,6 +105,31 @@ HashId Workspace::Commit(const std::string& message, const std::vector<PathStatu
     return id;
 }
 
+bool Workspace::Reset(const ResetMode mode, const HashId& commit_id) {
+    const auto tree_id = commit_id ? odb_.LoadCommit(commit_id).Tree() : HashId();
+
+    // Resetting working tree.
+    if (mode == ResetMode::Hard) {
+        if (!working_tree_->SwitchTo(tree_id)) {
+            return false;
+        }
+    }
+
+    // Resetting current branch.
+    if (mode == ResetMode::Soft || mode == ResetMode::Hard) {
+        auto branch = GetCurrentBranch();
+        // Reset stage.
+        stage_.reset();
+        // Update base of working tree.
+        StringToFile(state_path_ / "TREE", tree_id.ToHex());
+        // Update head of the branch.
+        branch.head = commit_id;
+        branches_->Put(branch.name, branch);
+    }
+
+    return true;
+}
+
 bool Workspace::Restore(const std::string& path) {
     if (const auto& entry = GetStage()->GetEntry(path)) {
         if (entry->id) {

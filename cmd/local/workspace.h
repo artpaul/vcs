@@ -11,6 +11,14 @@ namespace Vcs {
 class StageArea;
 class WorkingTree;
 
+enum class ResetMode {
+    None,
+    /// Reset only HEAD.
+    Soft,
+    /// Reset HEAD and working tree.
+    Hard,
+};
+
 /**
  * Local workspace.
  */
@@ -52,7 +60,10 @@ public:
     /** */
     HashId Commit(const std::string& message, const std::vector<PathStatus>& changes);
 
-    /** */
+    /** Resets HEAD and / or working tree. */
+    bool Reset(const ResetMode mode, const HashId& commit_id);
+
+    /** Restores path from HEAD. */
     bool Restore(const std::string& path);
 
     /** Emits status of changed items in the working tree. */

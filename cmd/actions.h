@@ -23,6 +23,8 @@ enum class Action {
     Log,
     /// Remove files from the working tree.
     Remove,
+    /// Reset current HEAD to the specified state.
+    Reset,
     /// Restore working tree files.
     Restore,
     /// Show various type of objects.
