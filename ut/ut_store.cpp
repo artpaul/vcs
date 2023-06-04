@@ -55,6 +55,13 @@ TEST(Datastore, Cache) {
     EXPECT_FALSE(Datastore().Chain(mem2).IsExists(id));
 }
 
+TEST(Datastore, GetChunkSize) {
+    EXPECT_EQ(Datastore(1024).GetChunkSize(), 1024u);
+    EXPECT_EQ(Datastore(4096).GetChunkSize(), 4096u);
+
+    EXPECT_EQ(Datastore(1024).Chain<Store::MemoryCache>(4096).GetChunkSize(), 1024u);
+}
+
 TEST(Datastore, InputStream) {
     auto mem = Store::MemoryCache::Make(1024);
     auto odb = Datastore(256).Chain(mem);

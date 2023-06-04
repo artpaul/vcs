@@ -37,8 +37,16 @@ public:
         }
     };
 
+    /**
+     * Makes a datastore with a default configuration and the give backend.
+     */
+    template <typename B, typename... Args>
+    static Datastore Make(Args&&... args) {
+        return Datastore(Datastore(), std::make_shared<B>(std::forward<Args>(args)...), false);
+    }
+
 public:
-    explicit Datastore(const size_t chunk_size = (4 << 20));
+    explicit Datastore(const size_t chunk_size = (4u << 20));
 
     ~Datastore();
 
@@ -65,12 +73,9 @@ public:
     }
 
     /**
-     * Makes a datastore with a default configuration and the give backend.
+     * Returns size of a chunk configured for the datastore.
      */
-    template <typename B, typename... Args>
-    static Datastore Make(Args&&... args) {
-        return Datastore(Datastore(), std::make_shared<B>(std::forward<Args>(args)...), false);
-    }
+    size_t GetChunkSize() const noexcept;
 
 public:
     /**
@@ -147,16 +152,16 @@ public:
     /**
      * Puts an object into the datastore.
      *
-     * @param type type of data object.
-     * @param content raw content of data object.
+     * @param type type of the data object.
+     * @param content raw content of the data object.
      */
     std::pair<HashId, DataType> Put(const DataType type, const std::string_view content);
 
     /**
      * Puts an object into the datastore.
      *
-     * @param meta type and size of data object.
-     * @param input input stream which provides content of data object.
+     * @param meta type and size of the data object.
+     * @param input input stream which provides content of the data object.
      */
     std::pair<HashId, DataType> Put(const DataHeader meta, InputStream input);
 

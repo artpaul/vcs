@@ -28,7 +28,7 @@ Object ConstructObjectFromIndex(const Index& index, const Datastore* odb) {
 
 class Datastore::Impl {
 public:
-    Impl(const size_t chunk_size) noexcept
+    constexpr Impl(const size_t chunk_size) noexcept
         : chunk_size_(chunk_size)
         , cache_(false) {
     }
@@ -90,33 +90,35 @@ public:
         return Object();
     }
 
-    void Put(const HashId& id, const DataType type, const std::string_view content) {
+    HashId Put(const DataType type, const std::string_view content) {
+        HashId id = HashId::Make(type, content);
+
+        PutImpl(id, type, content);
+
+        return id;
+    }
+
+private:
+    void PutImpl(const HashId& id, const DataType type, const std::string_view content) {
         if (chunk_size_ < content.size()) {
             throw std::runtime_error(
                 fmt::format("content size {} exceeds size of chunk {}", content.size(), chunk_size_)
             );
         }
+
         if (backend_) {
             backend_->Put(id, type, content);
         }
         if (upsteram_) {
-            upsteram_->Put(id, type, content);
+            upsteram_->PutImpl(id, type, content);
         }
-    }
-
-    HashId Put(const DataType type, const std::string_view content) {
-        HashId id = HashId::Make(type, content);
-
-        Put(id, type, content);
-
-        return id;
     }
 
 private:
     std::shared_ptr<Backend> backend_;
     std::shared_ptr<Impl> upsteram_;
     size_t chunk_size_;
-    /// Put objects received from upstream into local backend.
+    /// Put objects received from the upstream into local backend.
     bool cache_;
 };
 
@@ -129,6 +131,10 @@ Datastore::Datastore(const Datastore& other, std::shared_ptr<Backend> backend, b
 }
 
 Datastore::~Datastore() = default;
+
+size_t Datastore::GetChunkSize() const noexcept {
+    return impl_->ChunkSize();
+}
 
 DataHeader Datastore::GetMeta(const HashId& id, bool resolve) const {
     if (auto meta = impl_->GetMeta(id)) {
@@ -211,10 +217,8 @@ std::pair<HashId, DataType> Datastore::Put(const DataType type, const std::strin
     // Split content by parts.
     for (size_t offset = 0, end = content.size(); offset != end;) {
         const size_t size = std::min(impl_->ChunkSize(), content.size() - offset);
-        // Part of the content is saved as a blob object.
-        const HashId id = impl_->Put(DataType::Blob, content.substr(offset, size));
-        // Save part.
-        builder.Append(id, size);
+        // Save part the content as a blob object.
+        builder.Append(impl_->Put(DataType::Blob, content.substr(offset, size)), size);
 
         offset += size;
     }
@@ -253,10 +257,8 @@ std::pair<HashId, DataType> Datastore::Put(const DataHeader meta, InputStream in
     // Split content by parts.
     for (size_t offset = 0, end = meta.Size(); offset != end;) {
         const size_t size = std::min(impl_->ChunkSize(), meta.Size() - offset);
-        // Part of the content is saved as a blob object.
-        const HashId id = put_single_object(DataHeader::Make(DataType::Blob, size), input, &hasher);
-        // Save part.
-        index.Append(id, size);
+        // Save part the content as a blob object.
+        index.Append(put_single_object(DataHeader::Make(DataType::Blob, size), input, &hasher), size);
 
         offset += size;
     }
