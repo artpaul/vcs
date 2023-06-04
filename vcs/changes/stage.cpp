@@ -140,8 +140,8 @@ bool StageArea::Directory::Upsert(const std::string_view name, const PathEntry& 
     return true;
 }
 
-StageArea::StageArea(const Datastore& odb, const HashId& tree_id) noexcept
-    : odb_(odb)
+StageArea::StageArea(Datastore odb, const HashId& tree_id) noexcept
+    : odb_(std::move(odb))
     , tree_id_(tree_id) {
     // Check that tree_id points to Tree object.
     assert(!tree_id_ || odb_.GetType(tree_id_, true) == DataType::Tree);

@@ -2,6 +2,7 @@
 
 #include <vcs/changes/changelist.h>
 #include <vcs/object/serialize.h>
+#include <vcs/store/memory.h>
 
 #include <util/file.h>
 
@@ -158,7 +159,8 @@ void WorkingTree::Checkout(const std::string& p, const PathEntry& entry) {
 }
 
 bool WorkingTree::SwitchTo(const HashId& tree_id) {
-    StageArea stage(odb_, tree_id); // TODO: mem cache.
+    Datastore odb = odb_.Cache(Store::MemoryCache::Make());
+    StageArea stage(odb, tree_id);
 
     auto cb = [&](const Change& change) {
         if (change.action == PathAction::Add || change.action == PathAction::Change) {
@@ -176,7 +178,7 @@ bool WorkingTree::SwitchTo(const HashId& tree_id) {
     };
 
     // Caclculate changelist.
-    ChangelistBuilder(odb_, std::move(cb))
+    ChangelistBuilder(odb, std::move(cb))
         .SetExpandAdded(true)
         .SetExpandDeleted(false)
         .Changes(get_tree_(), tree_id);

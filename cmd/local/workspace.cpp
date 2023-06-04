@@ -5,6 +5,7 @@
 #include <vcs/changes/stage.h>
 #include <vcs/object/commit.h>
 #include <vcs/object/serialize.h>
+#include <vcs/store/memory.h>
 
 #include <util/file.h>
 
@@ -196,7 +197,9 @@ StageArea* Workspace::GetStage() const {
     if (!bool(stage_)) {
         const auto head = GetCurrentHead();
 
-        stage_ = std::make_unique<StageArea>(odb_, head ? odb_.LoadCommit(head).Tree() : HashId());
+        stage_ = std::make_unique<StageArea>(
+            odb_.Cache(Store::MemoryCache::Make()), head ? odb_.LoadCommit(head).Tree() : HashId()
+        );
     }
 
     return stage_.get();

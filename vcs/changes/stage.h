@@ -15,7 +15,7 @@ class StageArea {
     class Directory;
 
 public:
-    explicit StageArea(const Datastore& odb, const HashId& tree_id = HashId()) noexcept;
+    explicit StageArea(Datastore odb, const HashId& tree_id = HashId()) noexcept;
 
     ~StageArea();
 
@@ -87,7 +87,7 @@ private:
     ) const;
 
 private:
-    const Datastore& odb_;
+    Datastore odb_;
     /// Root of a base tree.
     HashId tree_id_;
     /// Root of the stage tree.
