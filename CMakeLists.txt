@@ -16,6 +16,11 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "")
     set(CMAKE_BUILD_TYPE "Debug")
 endif()
 
+if("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
+    message(STATUS "Enabling LTO...")
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif()
+
 # Third parties come with their own setup of
 # C++ standard and compiler options.
 add_subdirectory(contrib)
@@ -25,19 +30,12 @@ set(CMAKE_CXX_STANDARD 23)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wnon-virtual-dtor -Werror")
 
-if("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
-    message(STATUS "Enabling LTO...")
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
-endif()
-
 add_subdirectory(cmd)
 add_subdirectory(vcs)
 add_subdirectory(util)
 
 # Tests.
 if(BUILD_TESTS)
-    add_subdirectory(contrib/gtest)
-    add_subdirectory(contrib/benchmark)
     add_subdirectory(ut)
 
     # Local test projects.

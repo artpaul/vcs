@@ -16,7 +16,7 @@ TEST(Utils, Arena) {
 }
 
 TEST(Utils, SplitPath) {
-    const auto check_abc = [](const std::vector<std::string_view>& parts) {
+    const auto check_abc = []<typename T>(const std::vector<T>& parts) {
         ASSERT_EQ(parts.size(), 3u);
         EXPECT_EQ(parts[0], "a");
         EXPECT_EQ(parts[1], "b");
@@ -26,6 +26,8 @@ TEST(Utils, SplitPath) {
     check_abc(SplitPath("a/b/c"));
     check_abc(SplitPath("/a/b/c"));
     check_abc(SplitPath("/a//b/c/"));
+    check_abc(SplitString<std::string>("/a//b/c/", '/'));
+    check_abc(SplitString<std::string>("a.b.c", '.'));
 }
 
 TEST(Utils, Varlen) {

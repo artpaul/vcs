@@ -8,3 +8,9 @@ add_subdirectory(liblmdb)
 add_subdirectory(lz4)
 add_subdirectory(sha)
 add_subdirectory(xxhash)
+
+# Tests.
+if(BUILD_TESTS)
+    add_subdirectory(gtest)
+    add_subdirectory(benchmark)
+endif()
