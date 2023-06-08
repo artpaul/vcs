@@ -37,6 +37,8 @@ public:
         return Status(Code::IOError, error);
     }
 
+    std::string_view Message() const noexcept;
+
 public:
     /// Returns true if the status indicates success.
     constexpr bool IsIOError() const noexcept {
@@ -62,8 +64,6 @@ private:
         : code_(code)
         , error_(error) {
     }
-
-    std::string_view Message() const noexcept;
 
 private:
     Code code_{Code::Success};

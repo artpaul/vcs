@@ -55,7 +55,8 @@ auto Repository::Workspace::Save(const Workspace& rec) -> std::string {
 }
 
 Repository::Repository(const std::filesystem::path& path)
-    : bare_path_(path) {
+    : bare_path_(path)
+    , layout_(path) {
     // Open configs.
     config_ = std::make_unique<Config>();
     // Setup default configuration.
@@ -80,8 +81,8 @@ void Repository::Initialize(const std::filesystem::path& path) {
 
     std::filesystem::create_directory(path / "config");
     std::filesystem::create_directory(path / "db");
-    std::filesystem::create_directory(path / "db" / "workspaces");
     std::filesystem::create_directory(path / "db" / "branches");
+    std::filesystem::create_directory(path / "db" / "workspaces");
     std::filesystem::create_directory(path / "objects");
     std::filesystem::create_directory(path / "workspaces");
 
@@ -89,6 +90,10 @@ void Repository::Initialize(const std::filesystem::path& path) {
     std::make_unique<Database<Branch>>(path / "db" / "branches").reset(nullptr);
     // Initialize workspace database.
     std::make_unique<Database<Workspace>>(path / "db" / "workspaces").reset(nullptr);
+}
+
+Layout Repository::GetLayout() const {
+    return layout_;
 }
 
 Repository::Branch Repository::CreateBranch(const std::string& name, const HashId head) {
@@ -164,7 +169,7 @@ bool Repository::CreateWorkspace(const Workspace& params, bool checkout) {
         return false;
     }
 
-    const auto state_path = bare_path_ / "workspaces" / params.name;
+    const auto state_path = layout_.Workspace(params.name);
     const auto tree =
         params.tree ? params.tree : (branch->head ? odb_.LoadCommit(branch->head).Tree() : HashId());
 
@@ -189,7 +194,7 @@ bool Repository::CreateWorkspace(const Workspace& params, bool checkout) {
 
 std::optional<Repository::Workspace> Repository::GetWorkspace(const std::string& name) const {
     if (auto ws = workspaces_->Get(name)) {
-        const auto state_path = bare_path_ / "workspaces" / ws->name;
+        const auto state_path = layout_.Workspace(ws->name);
 
         ws->branch = StringFromFile(state_path / "HEAD");
 

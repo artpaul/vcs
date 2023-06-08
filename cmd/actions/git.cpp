@@ -5,13 +5,38 @@
 #include <contrib/cxxopts/cxxopts.hpp>
 #include <contrib/fmt/fmt/format.h>
 #include <contrib/fmt/fmt/std.h>
+#include <contrib/json/nlohmann.hpp>
 
 #include <unordered_map>
 
 namespace Vcs {
 namespace {
 
-int ExecuteConvert(int argc, char* argv[]) {
+struct Remap {
+    HashId git;
+    HashId vcs;
+
+    static Remap Load(const std::string_view data) {
+        auto json = nlohmann::json::parse(data);
+        Remap remap;
+
+        remap.git = HashId::FromHex(json["git"].get<std::string>());
+        remap.vcs = HashId::FromHex(json["vcs"].get<std::string>());
+
+        return remap;
+    }
+
+    static std::string Save(const Remap& rec) {
+        auto json = nlohmann::json::object();
+
+        json["git"] = rec.git.ToHex();
+        json["vcs"] = rec.vcs.ToHex();
+
+        return json.dump();
+    }
+};
+
+int ExecuteConvert(int argc, char* argv[], const std::function<Workspace&()>&) {
     struct {
         std::string branch;
         std::filesystem::path path;
@@ -32,24 +57,24 @@ int ExecuteConvert(int argc, char* argv[]) {
             }
         );
         spec.custom_help("[<options>]");
-        spec.parse_positional({"path"});
+        spec.parse_positional("path");
         spec.positional_help("[<directory>]");
 
-        auto result = spec.parse(argc, argv);
-        if (result.has("help")) {
+        const auto opts = spec.parse(argc, argv);
+        if (opts.has("help")) {
             fmt::print("{}\n", spec.help());
             return 0;
         }
 
-        if (result.has("path")) {
-            options.target_path = result["path"].as<std::string>();
+        if (opts.has("path")) {
+            options.target_path = opts["path"].as<std::string>();
             options.target_path = std::filesystem::absolute(options.target_path);
         } else {
             fmt::print(stderr, "error: path should be defined\n");
             return 1;
         }
-        if (result.has("git")) {
-            options.path = result["git"].as<std::string>();
+        if (opts.has("git")) {
+            options.path = opts["git"].as<std::string>();
             options.path = std::filesystem::absolute(options.path);
         } else {
             fmt::print(stderr, "error: git path should be defined\n");
@@ -89,6 +114,7 @@ int ExecuteConvert(int argc, char* argv[]) {
     }
 
     Repository repo(bare_path);
+    Database<Remap> db(repo.GetLayout().Databases() / "git", Lmdb::Options{.create_if_missing = true});
 
     HashId last;
     // Converting commits.
@@ -105,6 +131,8 @@ int ExecuteConvert(int argc, char* argv[]) {
         }
 
         remap.emplace(id, last);
+        // Save remap to database.
+        db.Put(id.ToBytes(), Remap{.git = id, .vcs = last});
     }
 
     repo.CreateBranch(options.branch, last);
@@ -133,20 +161,69 @@ int ExecuteConvert(int argc, char* argv[]) {
     return 0;
 }
 
+int ExecuteOid(int argc, char* argv[], const std::function<Workspace&()>& cb) {
+    struct {
+        HashId oid;
+    } options;
+
+    {
+        cxxopts::options spec(fmt::format("vcs git {}", argv[0]));
+        spec.add_options(
+            "",
+            {
+                {"h,help", "show help"},
+                {"oid", "git oid", cxxopts::value<std::string>()},
+            }
+        );
+        spec.custom_help("[<options>]");
+        spec.parse_positional("oid");
+        spec.positional_help("<oid>");
+
+        const auto opts = spec.parse(argc, argv);
+        if (opts.has("help")) {
+            fmt::print("{}\n", spec.help());
+            return 0;
+        }
+        if (opts.has("oid")) {
+            options.oid = HashId::FromHex(opts["oid"].as<std::string>());
+        } else {
+            fmt::print(stderr, "error: oid should be provided\n");
+            return 1;
+        }
+    }
+
+    Database<Remap> db(cb().GetLayout().Databases() / "git", Lmdb::Options());
+
+    if (const auto rec = db.Get(options.oid.ToBytes())) {
+        fmt::print("{}\n", rec.value().vcs);
+        return 0;
+    } else if (rec.error().IsNotFound()) {
+        fmt::print(stderr, "error: unknown oid '{}'\n", options.oid);
+        return 1;
+    } else {
+        fmt::print(stderr, "error: {}\n", rec.error().Message());
+        return 1;
+    }
+}
+
 void PrintHelp() {
-    fmt::print("vcs git convert <options> <output>\n");
+    fmt::print("usage: vcs git convert <options> <output>\n"
+               "   or: vcs git oid <options> <oid>\n");
 }
 
 } // namespace
 
-int ExecuteGit(int argc, char* argv[]) {
-    const std::unordered_map<std::string_view, std::function<int(int argc, char* argv[])>> actions = {
-        {"convert", ExecuteConvert},
-    };
+int ExecuteGit(int argc, char* argv[], const std::function<Workspace&()>& cb) {
+    const std::unordered_map<
+        std::string_view, std::function<int(int argc, char* argv[], const std::function<Workspace&()>& cb)>>
+        actions = {
+            {"convert", ExecuteConvert},
+            {"oid", ExecuteOid},
+        };
 
     if (argc > 1) {
         if (auto ai = actions.find(argv[1]); ai != actions.end()) {
-            return ai->second(argc - 1, argv + 1);
+            return ai->second(argc - 1, argv + 1, cb);
         }
     }
 

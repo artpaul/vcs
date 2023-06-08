@@ -1,6 +1,7 @@
 #pragma once
 
 #include "db.h"
+#include "layout.h"
 
 #include <vcs/object/store.h>
 
@@ -71,6 +72,9 @@ public:
 
     /** Initalize a bare repository. */
     static void Initialize(const std::filesystem::path& path);
+
+    /** Returns layout of internal directories. */
+    Layout GetLayout() const;
 
 public:
     /**
@@ -151,6 +155,8 @@ public:
 
 protected:
     std::filesystem::path bare_path_;
+    ///
+    Layout layout_;
     /// Configuration.
     std::unique_ptr<Config> config_;
     /// Object storage.

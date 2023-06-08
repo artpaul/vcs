@@ -12,7 +12,7 @@ extern int ExecuteCommit(int argc, char* argv[], const std::function<Workspace&(
 extern int ExecuteConfig(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteDiff(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteDump(int argc, char* argv[], const std::function<Workspace&()>& cb);
-extern int ExecuteGit(int argc, char* argv[]);
+extern int ExecuteGit(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteInit(int argc, char* argv[]);
 extern int ExecuteLog(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteReset(int argc, char* argv[], const std::function<Workspace&()>& cb);
@@ -74,7 +74,7 @@ static int Main(int argc, char* argv[]) {
         case Action::Dump:
             return ExecuteDump(argc - 1, argv + 1, get_workspace);
         case Action::Git:
-            return ExecuteGit(argc - 1, argv + 1);
+            return ExecuteGit(argc - 1, argv + 1, get_workspace);
 
         case Action::Branch:
             return ExecuteBranch(argc - 1, argv + 1, get_workspace);
