@@ -104,7 +104,10 @@ void Repository::DeleteBranch(const std::string& name) {
 }
 
 std::optional<Repository::Branch> Repository::GetBranch(const std::string& name) const {
-    return branches_->Get(name);
+    if (auto branch = branches_->Get(name)) {
+        return branch.value();
+    }
+    return std::nullopt;
 }
 
 void Repository::ListBranches(const std::function<void(const Branch& branch)>& cb) const {
@@ -194,7 +197,7 @@ std::optional<Repository::Workspace> Repository::GetWorkspace(const std::string&
             ws->tree = branch->head ? odb_.LoadCommit(branch->head).Tree() : HashId();
         }
 
-        return ws;
+        return ws.value();
     }
 
     return std::nullopt;
