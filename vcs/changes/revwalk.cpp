@@ -57,7 +57,7 @@ public:
     }
 
     HashId GetHash(const Format::Record* rec, const uint32_t idx) const override {
-        if (idx >= 2 + rec->parents) {
+        if (idx >= 2u + rec->parents) {
             return HashId();
         }
         return HashId::FromBytes(

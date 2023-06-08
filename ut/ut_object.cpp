@@ -195,15 +195,15 @@ TEST(RangeIterator, RandomAccessIterator) {
                   std::random_access_iterator_tag>);
 
     TEST_SEMANTIC(EXPECT_EQ((a += n), b));
-    TEST_SEMANTIC(EXPECT_EQ(std::addressof(a += n), std::addressof(a)));
-    TEST_SEMANTIC(EXPECT_EQ(std::addressof(b -= n), std::addressof(b)));
-    TEST_SEMANTIC(EXPECT_EQ((a + n), (a += n)));
+    TEST_SEMANTIC(auto c = std::addressof(a); EXPECT_EQ(std::addressof(a += n), c));
+    TEST_SEMANTIC(auto c = std::addressof(b); EXPECT_EQ(std::addressof(b -= n), c));
+    TEST_SEMANTIC(auto c = a + n; EXPECT_EQ(c, (a += n)));
     TEST_SEMANTIC(EXPECT_EQ((a + n), (n + a)));
     TEST_SEMANTIC(EXPECT_EQ((a + 0), a));
     TEST_SEMANTIC(EXPECT_EQ((a + (n - 1)), (--b)));
     TEST_SEMANTIC(EXPECT_EQ((b += -n), a));
     TEST_SEMANTIC(EXPECT_EQ((b -= n), a));
-    TEST_SEMANTIC(EXPECT_EQ((b - n), (b -= n)));
+    TEST_SEMANTIC(auto c = b - n; EXPECT_EQ(c, (b -= n)));
     TEST_SEMANTIC(EXPECT_EQ(a[n], *b));
     TEST_SEMANTIC(EXPECT_TRUE(a <= b));
 
@@ -215,6 +215,7 @@ TEST(RangeIterator, Throw) {
         static HashId Item(const void*, size_t) noexcept(false) {
             return HashId();
         }
+
         static size_t Size(const void*) {
             return 0;
         }
@@ -237,6 +238,7 @@ TEST(RangeIterator, NoThrow) {
         static constexpr HashId Item(const S*, size_t) noexcept(true) {
             return HashId();
         }
+
         static constexpr size_t Size(const S* p) noexcept {
             return p->Size();
         }

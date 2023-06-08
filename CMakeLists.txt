@@ -29,6 +29,10 @@ add_subdirectory(contrib)
 set(CMAKE_CXX_STANDARD 23)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wnon-virtual-dtor -Werror")
+# Disable annoying gcc warnings.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-missing-field-initializers -Wno-implicit-fallthrough")
+endif()
 
 add_subdirectory(cmd)
 add_subdirectory(vcs)
