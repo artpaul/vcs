@@ -99,7 +99,11 @@ Layout Repository::GetLayout() const {
 Repository::Branch Repository::CreateBranch(const std::string& name, const HashId head) {
     auto branch = Branch{.name = name, .head = head};
 
-    branches_->Put(name, branch);
+    if (auto status = branches_->Put(name, branch); !status) {
+        throw std::runtime_error(
+            fmt::format("cannot create branch '{}' reason '{}'", name, status.Message())
+        );
+    }
 
     return branch;
 }

@@ -132,7 +132,10 @@ int ExecuteConvert(int argc, char* argv[], const std::function<Workspace&()>&) {
 
         remap.emplace(id, last);
         // Save remap to database.
-        db.Put(id.ToBytes(), Remap{.git = id, .vcs = last});
+        if (const auto status = db.Put(id.ToBytes(), Remap{.git = id, .vcs = last}); !status) {
+            fmt::print(stderr, "error: cannot write remap '{}'\n", status.Message());
+            return 1;
+        }
     }
 
     repo.CreateBranch(options.branch, last);
@@ -141,6 +144,7 @@ int ExecuteConvert(int argc, char* argv[], const std::function<Workspace&()>&) {
     if (const auto& b = repo.GetBranch(options.branch)) {
         fmt::print("branch '{}' set to {}\n", options.branch, b->head);
     } else {
+        fmt::print(stderr, "error: cannot get branch '{}'\n", options.branch);
         return 1;
     }
 

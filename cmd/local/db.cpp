@@ -190,7 +190,7 @@ Status Database::Impl::Put(const std::string_view k, const std::string_view valu
     TXN txn;
     int ret = 0;
 
-    if ((ret = ::mdb_txn_begin(env_, nullptr, MDB_RDONLY, &txn.txn)) != MDB_SUCCESS) {
+    if ((ret = ::mdb_txn_begin(env_, nullptr, 0, &txn.txn)) != MDB_SUCCESS) {
         return Status::IOError(ret);
     }
     if ((ret = ::mdb_dbi_open(txn.txn, nullptr, 0, &dbi.dbi)) != MDB_SUCCESS) {
