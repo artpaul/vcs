@@ -213,7 +213,7 @@ HashId Converter::Impl::ConvertCommit(const HashId& id, Datastore odb) {
 
     std::unique_ptr<git_commit, std::function<void(git_commit*)>> wcommit(
         [&]() {
-            git_commit* r;
+            git_commit* r{};
             CheckError(git_commit_lookup(&r, repo_, &oid), "looking up commit during revwalk");
             return r;
         }(),
@@ -222,7 +222,7 @@ HashId Converter::Impl::ConvertCommit(const HashId& id, Datastore odb) {
 
     std::unique_ptr<git_tree, std::function<void(git_tree*)>> tree(
         [&]() {
-            git_tree* r;
+            git_tree* r{};
             CheckError(git_commit_tree(&r, wcommit.get()), "looking up tree");
             return r;
         }(),
@@ -259,7 +259,7 @@ HashId Converter::Impl::ConvertCommit(const HashId& id, Datastore odb) {
 
             std::unique_ptr<git_commit, std::function<void(git_commit*)>> parent_commit(
                 [&]() {
-                    git_commit* r;
+                    git_commit* r{};
                     CheckError(git_commit_lookup(&r, repo_, parent_oid), "parent commit");
                     return r;
                 }(),
@@ -268,7 +268,7 @@ HashId Converter::Impl::ConvertCommit(const HashId& id, Datastore odb) {
 
             std::unique_ptr<git_tree, std::function<void(git_tree*)>> parent_tree(
                 [&]() {
-                    git_tree* r;
+                    git_tree* r{};
                     CheckError(git_commit_tree(&r, parent_commit.get()), "parent tree");
                     return r;
                 }(),
@@ -359,7 +359,7 @@ void Converter::Impl::ListCommits(
 ) const {
     std::unique_ptr<git_reference, std::function<void(git_reference*)>> ref(
         [&]() {
-            git_reference* ref;
+            git_reference* ref{};
             CheckError(
                 ::git_branch_lookup(&ref, repo_, head.c_str(), GIT_BRANCH_LOCAL), "reference lookup"
             );
@@ -370,7 +370,7 @@ void Converter::Impl::ListCommits(
 
     std::unique_ptr<git_revwalk, std::function<void(git_revwalk*)>> walk(
         [&]() {
-            git_revwalk* r;
+            git_revwalk* r{};
             CheckError(::git_revwalk_new(&r, repo_), "start revwalk");
             return r;
         }(),
