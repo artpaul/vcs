@@ -39,29 +39,16 @@ int Execute(const Options& options, const Workspace& repo) {
     };
 
     const auto print_commit = [&](const HashId& id, const Commit& c) {
-        const auto author = c.Author();
-        const auto committer = c.Committer();
-
         // Header.
         fmt::print("{}\n", fmt::styled(fmt::format("commit {}", id), head_style()));
         // Author.
-        if (author) {
+        if (const auto author = c.Author()) {
             fmt::print(
                 "Author: {}{}\n",
                 // Name.
                 author.Name(),
                 // Login or email.
                 author.Id().empty() ? "" : fmt::format(" <{}>", author.Id())
-            );
-        }
-        // Committer.
-        if (committer && author != committer) {
-            fmt::print(
-                "Committer: {}{}\n",
-                // Name.
-                committer.Name(),
-                // Login or email.
-                committer.Id().empty() ? "" : fmt::format(" <{}>", committer.Id())
             );
         }
         // Date.

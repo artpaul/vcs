@@ -239,10 +239,10 @@ HashId Commit::Renames() const {
 uint64_t Commit::Timestamp() const {
     const auto commit = Fbs::GetCommit(Adaptor::GetData(data_.get()));
 
-    if (const auto commiter = commit->committer()) {
-        return commiter->when();
-    } else if (const auto author = commit->author()) {
+    if (const auto author = commit->author()) {
         return author->when();
+    } else if (const auto commiter = commit->committer()) {
+        return commiter->when();
     }
 
     return 0;
