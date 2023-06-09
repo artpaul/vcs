@@ -1,13 +1,17 @@
 #include <cmd/local/workspace.h>
+#include <cmd/ui/printer.h>
 #include <vcs/changes/changelist.h>
 #include <vcs/changes/path.h>
+#include <vcs/changes/stage.h>
 #include <vcs/object/commit.h>
+#include <vcs/store/memory.h>
 
 #include <util/tty.h>
 
 #include <contrib/cxxopts/cxxopts.hpp>
 #include <contrib/fmt/fmt/color.h>
 #include <contrib/fmt/fmt/format.h>
+#include <contrib/libgit2/include/git2.h>
 
 namespace Vcs {
 namespace {
@@ -15,6 +19,8 @@ namespace {
 struct Options {
     HashId id{};
     std::vector<std::string> paths;
+    /// Number of context lines in output.
+    size_t context_lines = 3;
     bool name_only = false;
     bool name_status = false;
 };
@@ -113,6 +119,50 @@ int ShowCommit(const Options& options, const Commit& commit, const Datastore& od
             .SetExpandDeleted(true)
             .SetInclude(PathFilter(options.paths))
             .Changes(commit.Parents() ? commit.Parents()[0] : HashId(), options.id);
+    } else {
+        const auto from = commit.Parents() ? odb.Load(commit.Parents()[0]).AsCommit().Tree() : HashId();
+        const auto to = options.id ? odb.Load(options.id).AsCommit().Tree() : HashId();
+        auto stage_odb = odb.Cache(Store::MemoryCache::Make());
+
+        const auto cb = [&, first = true](const Change& change) mutable {
+            if (change.type != PathType::File) {
+                return;
+            }
+            if (first) {
+                fmt::print("\n");
+                first = false;
+            }
+
+            PrintHeader(change);
+
+            {
+                std::string a;
+                std::string b;
+
+                if (change.action == PathAction::Add) {
+                    b = odb.LoadBlob(StageArea(stage_odb, to).GetEntry(change.path)->id);
+                } else if (change.action == PathAction::Change) {
+                    a = odb.LoadBlob(StageArea(stage_odb, from).GetEntry(change.path)->id);
+                    b = odb.LoadBlob(StageArea(stage_odb, to).GetEntry(change.path)->id);
+                } else if (change.action == PathAction::Delete) {
+                    a = odb.LoadBlob(StageArea(stage_odb, from).GetEntry(change.path)->id);
+                } else {
+                    return;
+                }
+
+                Printer().SetA(a).SetB(b).SetContexLines(options.context_lines).Print(stdout);
+            }
+        };
+
+        git_libgit2_init();
+
+        ChangelistBuilder(stage_odb, cb)
+            .SetExpandAdded(true)
+            .SetExpandDeleted(true)
+            .SetInclude(PathFilter(options.paths))
+            .Changes(commit.Parents() ? commit.Parents()[0] : HashId(), options.id);
+        // Shutdown libgit2.
+        git_libgit2_shutdown();
     }
 
     return 0;
@@ -150,6 +200,7 @@ int ExecuteShow(int argc, char* argv[], const std::function<Workspace&()>& cb) {
             "",
             {
                 {"h,help", "print help"},
+                {"U,unified", "generate diffs with <n> lines", cxxopts::value(options.context_lines)},
                 {"name-only", "show only names of changed files", cxxopts::value(options.name_only)},
                 {"name-status", "show only names and status of changed files",
                  cxxopts::value(options.name_status)},

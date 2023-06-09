@@ -12,6 +12,7 @@ target_sources(vcs-local PRIVATE
     "local/db.cpp"
     "local/workspace.cpp"
     "local/worktree.cpp"
+    "ui/printer.cpp"
 )
 
 target_link_libraries(vcs
