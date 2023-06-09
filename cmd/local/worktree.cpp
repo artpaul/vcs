@@ -74,6 +74,7 @@ WorkingTree::WorkingTree(const std::filesystem::path& path, Datastore odb, std::
     : path_(path)
     , odb_(std::move(odb))
     , get_tree_(std::move(cb)) {
+    assert(path_.is_absolute());
     assert(get_tree_);
 }
 
@@ -342,7 +343,7 @@ void WorkingTree::Status(const StatusOptions& options, const StageArea& stage, c
 
     for (const auto& entry : di) {
         const auto& filename = entry.path().filename().string();
-        const auto& path = std::filesystem::relative(entry.path(), path_).string();
+        const auto& path = entry.path().lexically_relative(path_).string();
 
         //
         emit_deleted(di.depth() + 1);

@@ -181,10 +181,10 @@ std::filesystem::path Workspace::ToAbsolutePath(const std::string& path) const {
 }
 
 std::string Workspace::ToTreePath(const std::filesystem::path& path) const {
-    auto result =
-        path.is_relative()
-            ? std::filesystem::relative(std::filesystem::current_path() / path, working_tree_->GetPath())
-            : std::filesystem::relative(path, working_tree_->GetPath());
+    auto result = path.is_relative()
+                    ? std::filesystem::weakly_canonical(std::filesystem::current_path() / path)
+                          .lexically_relative(working_tree_->GetPath())
+                    : std::filesystem::weakly_canonical(path).lexically_relative(working_tree_->GetPath());
 
     if (result == ".") {
         return std::string();
