@@ -18,6 +18,8 @@ namespace {
 struct Options {
     /// Paths to show.
     std::vector<std::string> paths;
+    /// Coloring mode.
+    ColorMode coloring = ColorMode::Auto;
     /// Number of context lines in output.
     size_t context_lines = 3;
 };
@@ -45,7 +47,12 @@ void PrintBlob(const Options& options, const Workspace& repo, const PathStatus& 
         return;
     }
 
-    Printer().SetA(a).SetB(b).SetContexLines(options.context_lines).Print(stdout);
+    Printer()
+        .SetA(a)
+        .SetB(b)
+        .SetColorMode(options.coloring)
+        .SetContexLines(options.context_lines)
+        .Print(stdout);
 }
 
 void PrintCurrentChanges(const Options& options, const Workspace& repo) {
@@ -54,7 +61,7 @@ void PrintCurrentChanges(const Options& options, const Workspace& repo) {
             return;
         }
         if (status.status == PathStatus::Deleted || status.status == PathStatus::Modified) {
-            PrintHeader(status);
+            PrintHeader(status, options.coloring);
             PrintBlob(options, repo, status);
         }
     });
@@ -80,6 +87,7 @@ int ExecuteDiff(int argc, char* argv[], const std::function<Workspace&()>& cb) {
             "",
             {
                 {"h,help", "print help"},
+                {"color", "coloring mode [always|auto|none]", cxxopts::value<std::string>(), "<mode>"},
                 {"U,unified", "generate diffs with <n> lines", cxxopts::value(options.context_lines)},
                 {"paths", "path to show", cxxopts::value<std::vector<std::string>>()},
             }
@@ -92,6 +100,16 @@ int ExecuteDiff(int argc, char* argv[], const std::function<Workspace&()>& cb) {
         if (opts.count("help")) {
             fmt::print("{}\n", spec.help());
             return 0;
+        }
+        if (opts.has("color")) {
+            const auto arg = opts["color"].as<std::string>();
+
+            if (auto coloring = ParseColorMode(arg)) {
+                options.coloring = *coloring;
+            } else {
+                fmt::print(stderr, "error: unknown coloring mode '{}'\n", arg);
+                return 1;
+            }
         }
         if (opts.has("paths")) {
             const auto& paths = opts["paths"].as<std::vector<std::string>>();

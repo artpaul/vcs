@@ -1,5 +1,8 @@
 #pragma once
 
+#include <optional>
+#include <string_view>
+
 namespace Vcs {
 
 enum class ColorMode {
@@ -10,5 +13,9 @@ enum class ColorMode {
     /// Always emit colored output.
     Always,
 };
+
+bool IsColored(const ColorMode mode, FILE* output);
+
+std::optional<ColorMode> ParseColorMode(const std::string_view value);
 
 } // namespace Vcs

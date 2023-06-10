@@ -10,26 +10,55 @@
 namespace Vcs {
 namespace {
 
+struct Params {
+    FILE* output;
+    ColorMode mode;
+};
+
+std::pair<std::string_view, std::string_view> SplitHunk(const std::string_view hunk) {
+    if (hunk.size() > 2 && (hunk[0] == '@' && hunk[1] == '@')) {
+        const auto pos = hunk.find("@@", 2);
+
+        if (pos != std::string_view::npos) {
+            return std::make_pair(hunk.substr(0, pos + 2), hunk.substr(pos + 2));
+        }
+    }
+
+    return std::make_pair(hunk, std::string_view());
+}
+
+std::pair<std::string_view, std::string_view> SplitEol(const std::string_view line) {
+    const auto pos = line.find_last_of('\n');
+
+    if (pos != std::string_view::npos) {
+        return std::make_pair(line.substr(0, pos), line.substr(pos));
+    }
+
+    return std::make_pair(line, std::string_view());
+}
+
 int DoHunk(const git_diff_delta*, const git_diff_hunk* hunk, void* payload) {
-    FILE* const output = static_cast<FILE*>(payload);
+    Params* const params = static_cast<Params*>(payload);
 
     const auto style = [&]() {
-        if (util::is_atty(output)) {
+        if (IsColored(params->mode, params->output)) {
             return fmt::fg(fmt::terminal_color::cyan);
         }
         return fmt::text_style();
     };
 
-    fmt::print(output, style(), "{}", std::string_view(hunk->header, hunk->header_len));
+    const auto [first, second] = SplitHunk(std::string_view(hunk->header, hunk->header_len));
+
+    fmt::print(params->output, "{}{}", fmt::styled(first, style()), second);
 
     return 0;
 }
 
 int DoLine(const git_diff_delta*, const git_diff_hunk*, const git_diff_line* line, void* payload) {
-    FILE* const output = static_cast<FILE*>(payload);
+    Params* const params = static_cast<Params*>(payload);
 
-    const auto style = [&]() {
-        if (util::is_atty(output)) {
+    const auto line_style = [&]() {
+        if (IsColored(params->mode, params->output)) {
             if (line->origin == GIT_DIFF_LINE_ADDITION) {
                 return fmt::fg(fmt::terminal_color::green);
             }
@@ -42,25 +71,37 @@ int DoLine(const git_diff_delta*, const git_diff_hunk*, const git_diff_line* lin
 
     switch (line->origin) {
         case GIT_DIFF_LINE_CONTEXT:
-            fmt::print(output, " {}", std::string_view(line->content, line->content_len));
+            fmt::print(params->output, " {}", std::string_view(line->content, line->content_len));
             break;
         case GIT_DIFF_LINE_ADDITION:
-            fmt::print(output, style(), "+{}", std::string_view(line->content, line->content_len));
+        case GIT_DIFF_LINE_DELETION: {
+            const auto sign = line->origin == GIT_DIFF_LINE_ADDITION ? '+' : '-';
+            const auto style = line_style();
+
+            if (style.has_foreground()) {
+                const auto [first, second] = SplitEol(std::string_view(line->content, line->content_len));
+
+                fmt::print(
+                    params->output, "{}{}", fmt::styled(fmt::format("{}{}", sign, first), style), second
+                );
+            } else {
+                fmt::print(
+                    params->output, "{}{}", sign, std::string_view(line->content, line->content_len)
+                );
+            }
             break;
-        case GIT_DIFF_LINE_DELETION:
-            fmt::print(output, style(), "-{}", std::string_view(line->content, line->content_len));
-            break;
+        }
         case GIT_DIFF_LINE_ADD_EOFNL:
         case GIT_DIFF_LINE_CONTEXT_EOFNL:
         case GIT_DIFF_LINE_DEL_EOFNL:
-            fmt::print(output, "{}", std::string_view(line->content, line->content_len));
+            fmt::print(params->output, "{}", std::string_view(line->content, line->content_len));
             break;
         default:
             break;
     }
 
     return 0;
-}
+} // namespace
 
 } // namespace
 
@@ -71,9 +112,10 @@ void Printer::Print(FILE* output) {
     options.context_lines = context_lines_;
     options.flags = GIT_DIFF_NORMAL;
 
+    Params params{.output = output, .mode = color_mode_};
     git_diff_buffers(
         a_.data(), a_.size(), "a", b_.data(), b_.size(), "b", &options, nullptr, nullptr, DoHunk, DoLine,
-        output
+        &params
     );
 }
 
@@ -93,9 +135,9 @@ std::string_view PathTypeToMode(const PathType type) noexcept {
     return "0000000";
 }
 
-void PrintHeader(const Change& change) {
-    const auto style = []() {
-        if (util::is_atty(stdout)) {
+void PrintHeader(const Change& change, const ColorMode coloring) {
+    const auto style = [&]() {
+        if (IsColored(coloring, stdout)) {
             return fmt::text_style(fmt::emphasis::bold);
         }
         return fmt::text_style();
@@ -146,9 +188,9 @@ void PrintHeader(const Change& change) {
     }
 }
 
-void PrintHeader(const PathStatus& status) {
-    const auto style = []() {
-        if (util::is_atty(stdout)) {
+void PrintHeader(const PathStatus& status, const ColorMode coloring) {
+    const auto style = [&]() {
+        if (IsColored(coloring, stdout)) {
             return fmt::text_style(fmt::emphasis::bold);
         }
         return fmt::text_style();

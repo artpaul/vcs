@@ -1,4 +1,5 @@
 #include <cmd/local/workspace.h>
+#include <cmd/ui/color.h>
 #include <vcs/object/commit.h>
 
 #include <util/tty.h>
@@ -17,6 +18,8 @@ struct Options {
     HashId head{};
     /// Maximum number of commits to output.
     uint64_t count = std::numeric_limits<uint64_t>::max();
+    /// Coloring mode.
+    ColorMode coloring = ColorMode::Auto;
     /// Use only one line for each log entry.
     bool oneline = false;
 };
@@ -24,8 +27,8 @@ struct Options {
 int Execute(const Options& options, const Workspace& repo) {
     uint64_t count = 0u;
 
-    const auto head_style = [] {
-        if (util::is_atty(stdout)) {
+    const auto head_style = [&] {
+        if (IsColored(options.coloring, stdout)) {
             return fmt::fg(fmt::terminal_color::yellow);
         } else {
             return fmt::text_style();
@@ -94,6 +97,7 @@ int ExecuteLog(int argc, char* argv[], const std::function<Workspace&()>& cb) {
                 {"h,help", "print help"},
                 {"n", "number of commits to output", cxxopts::value<uint64_t>(options.count)},
                 {"oneline", "one commit per line", cxxopts::value<bool>(options.oneline)},
+                {"color", "coloring mode [always|auto|none]", cxxopts::value<std::string>(), "<mode>"},
                 {"args", "free args", cxxopts::value<std::vector<std::string>>()},
             }
         );
@@ -113,6 +117,16 @@ int ExecuteLog(int argc, char* argv[], const std::function<Workspace&()>& cb) {
 
             if (const auto id = repo.ResolveReference(args[0])) {
                 options.head = *id;
+            }
+        }
+        if (opts.has("color")) {
+            const auto arg = opts["color"].as<std::string>();
+
+            if (auto coloring = ParseColorMode(arg)) {
+                options.coloring = *coloring;
+            } else {
+                fmt::print(stderr, "error: unknown coloring mode '{}'\n", arg);
+                return 1;
             }
         }
 

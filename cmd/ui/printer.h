@@ -1,6 +1,6 @@
 #pragma once
 
-#include "colors.h"
+#include "color.h"
 
 #include <cmd/local/status.h>
 #include <vcs/object/change.h>
@@ -40,8 +40,8 @@ private:
 
 std::string_view PathTypeToMode(const PathType type) noexcept;
 
-void PrintHeader(const Change& change);
+void PrintHeader(const Change& change, const ColorMode coloring);
 
-void PrintHeader(const PathStatus& status);
+void PrintHeader(const PathStatus& status, const ColorMode coloring);
 
 } // namespace Vcs

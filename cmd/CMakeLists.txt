@@ -12,6 +12,7 @@ target_sources(vcs-local PRIVATE
     "local/db.cpp"
     "local/workspace.cpp"
     "local/worktree.cpp"
+    "ui/color.cpp"
     "ui/printer.cpp"
 )
 

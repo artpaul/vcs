@@ -19,6 +19,8 @@ namespace {
 struct Options {
     HashId id{};
     std::vector<std::string> paths;
+    /// Coloring mode.
+    ColorMode coloring = ColorMode::Auto;
     /// Number of context lines in output.
     size_t context_lines = 3;
     bool name_only = false;
@@ -35,8 +37,8 @@ int ShowBlob(const Blob& blob) {
 }
 
 int ShowCommit(const Options& options, const Commit& commit, const Datastore& odb) {
-    const auto head_style = [] {
-        if (util::is_atty(stdout)) {
+    const auto head_style = [&] {
+        if (IsColored(options.coloring, stdout)) {
             return fmt::fg(fmt::terminal_color::yellow);
         } else {
             return fmt::text_style();
@@ -85,7 +87,7 @@ int ShowCommit(const Options& options, const Commit& commit, const Datastore& od
             };
 
             const auto status_style = [&]() {
-                if (!util::is_atty(stdout)) {
+                if (!IsColored(options.coloring, stdout)) {
                     return fmt::text_style();
                 }
                 if (change.action == PathAction::Add) {
@@ -133,7 +135,7 @@ int ShowCommit(const Options& options, const Commit& commit, const Datastore& od
                 first = false;
             }
 
-            PrintHeader(change);
+            PrintHeader(change, options.coloring);
 
             {
                 std::string a;
@@ -150,7 +152,12 @@ int ShowCommit(const Options& options, const Commit& commit, const Datastore& od
                     return;
                 }
 
-                Printer().SetA(a).SetB(b).SetContexLines(options.context_lines).Print(stdout);
+                Printer()
+                    .SetA(a)
+                    .SetB(b)
+                    .SetColorMode(options.coloring)
+                    .SetContexLines(options.context_lines)
+                    .Print(stdout);
             }
         };
 
@@ -200,6 +207,7 @@ int ExecuteShow(int argc, char* argv[], const std::function<Workspace&()>& cb) {
             "",
             {
                 {"h,help", "print help"},
+                {"color", "coloring mode [always|auto|none]", cxxopts::value<std::string>(), "<mode>"},
                 {"U,unified", "generate diffs with <n> lines", cxxopts::value(options.context_lines)},
                 {"name-only", "show only names of changed files", cxxopts::value(options.name_only)},
                 {"name-status", "show only names and status of changed files",
@@ -216,6 +224,16 @@ int ExecuteShow(int argc, char* argv[], const std::function<Workspace&()>& cb) {
         if (opts.has("help")) {
             fmt::print("{}\n", spec.help());
             return 0;
+        }
+        if (opts.has("color")) {
+            const auto arg = opts["color"].as<std::string>();
+
+            if (auto coloring = ParseColorMode(arg)) {
+                options.coloring = *coloring;
+            } else {
+                fmt::print(stderr, "error: unknown coloring mode '{}'\n", arg);
+                return 1;
+            }
         }
         if (opts.has("args")) {
             const auto& args = opts["args"].as<std::vector<std::string>>();
