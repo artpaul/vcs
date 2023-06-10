@@ -22,7 +22,35 @@ extern int ExecuteStatus(int argc, char* argv[], const std::function<Workspace&(
 extern int ExecuteSwitch(int argc, char* argv[], const std::function<Workspace&()>& cb);
 
 static int Main(int argc, char* argv[]) {
-    if (argc < 2) {
+    {
+        cxxopts::options spec("vcs");
+        spec.add_options(
+            "",
+            {
+                {"h,help", "print help"},
+                {"C", "change working directory", cxxopts::value<std::string>(), "<path>"},
+                {"P,no-pager", "do not pipe output into a pager", cxxopts::value<bool>()},
+            }
+        );
+
+        spec.stop_on_positional();
+        spec.custom_help("[<options>]");
+        spec.positional_help("<command> [<args>]");
+
+        const auto& opts = spec.parse(argc, argv);
+        if (opts.has("help")) {
+            fmt::print("{}\n", spec.help());
+            return 0;
+        }
+        if (opts.has("C")) {
+            std::filesystem::current_path(opts["C"].as<std::string>());
+        }
+
+        argc -= opts.consumed();
+        argv += opts.consumed();
+    }
+
+    if (argc < 1) {
         return 0;
     }
 
@@ -70,42 +98,42 @@ static int Main(int argc, char* argv[]) {
         return *workspace;
     };
 
-    switch (ParseAction(argv[1])) {
+    switch (ParseAction(argv[0])) {
         case Action::Dump:
-            return ExecuteDump(argc - 1, argv + 1, get_workspace);
+            return ExecuteDump(argc, argv, get_workspace);
         case Action::Git:
-            return ExecuteGit(argc - 1, argv + 1, get_workspace);
+            return ExecuteGit(argc, argv, get_workspace);
 
         case Action::Branch:
-            return ExecuteBranch(argc - 1, argv + 1, get_workspace);
+            return ExecuteBranch(argc, argv, get_workspace);
         case Action::Clean:
             break;
         case Action::Commit:
-            return ExecuteCommit(argc - 1, argv + 1, get_workspace);
+            return ExecuteCommit(argc, argv, get_workspace);
         case Action::Config:
-            return ExecuteConfig(argc - 1, argv + 1, get_workspace);
+            return ExecuteConfig(argc, argv, get_workspace);
         case Action::Diff:
-            return ExecuteDiff(argc - 1, argv + 1, get_workspace);
+            return ExecuteDiff(argc, argv, get_workspace);
         case Action::Init:
-            return ExecuteInit(argc - 1, argv + 1);
+            return ExecuteInit(argc, argv);
         case Action::Log:
-            return ExecuteLog(argc - 1, argv + 1, get_workspace);
+            return ExecuteLog(argc, argv, get_workspace);
         case Action::Remove:
             break;
         case Action::Reset:
-            return ExecuteReset(argc - 1, argv + 1, get_workspace);
+            return ExecuteReset(argc, argv, get_workspace);
         case Action::Restore:
-            return ExecuteRestore(argc - 1, argv + 1, get_workspace);
+            return ExecuteRestore(argc, argv, get_workspace);
         case Action::Show:
-            return ExecuteShow(argc - 1, argv + 1, get_workspace);
+            return ExecuteShow(argc, argv, get_workspace);
         case Action::Status:
-            return ExecuteStatus(argc - 1, argv + 1, get_workspace);
+            return ExecuteStatus(argc, argv, get_workspace);
         case Action::Switch:
-            return ExecuteSwitch(argc - 1, argv + 1, get_workspace);
+            return ExecuteSwitch(argc, argv, get_workspace);
         case Action::Workspace:
             break;
         case Action::Unknown:
-            fmt::print(stderr, "error: unknown command '{}'\n", argv[1]);
+            fmt::print(stderr, "error: unknown command '{}'\n", argv[0]);
             return 1;
     }
 
