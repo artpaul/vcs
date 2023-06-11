@@ -241,6 +241,13 @@ int ExecuteShow(int argc, char* argv[], const std::function<Workspace&()>& cb) {
 
             if (const auto id = repo.ResolveReference(args[0])) {
                 options.id = *id;
+            } else if (!repo.HasPath(repo.GetCurrentHead(), args[0])) {
+                fmt::print(
+                    stderr,
+                    "error: ambiguous argument '{}': unknown revision or path not in the working tree.\n",
+                    args[0]
+                );
+                return 1;
             }
 
             for (size_t i = (bool(options.id) ? 1 : 0), end = args.size(); i < end; ++i) {
