@@ -84,6 +84,8 @@ private:
     StageArea* GetStage() const;
 
 private:
+    class Resolver;
+
     std::filesystem::path state_path_;
     /// Cached instance of stage area.
     mutable std::unique_ptr<StageArea> stage_;

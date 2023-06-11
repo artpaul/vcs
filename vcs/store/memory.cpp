@@ -25,8 +25,14 @@ bool MemoryCache::Exists(const HashId& id) const {
     return objects_.find(id) != objects_.end();
 }
 
-Object MemoryCache::Load(const HashId& id, const DataType) const {
+Object MemoryCache::Load(const HashId& id, const DataType expected) const {
     if (auto oi = objects_.find(id); oi != objects_.end()) {
+        // Type mismatch.
+        if ((expected != DataType::None) && (oi->second->second.Type() != expected)
+            && (oi->second->second.Type() != DataType::Index))
+        {
+            return Object();
+        }
         list_.splice(list_.end(), list_, oi->second);
         return oi->second->second;
     } else {

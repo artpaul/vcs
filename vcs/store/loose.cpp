@@ -152,7 +152,7 @@ Object Loose::Load(const HashId& id, const DataType expected) const try
         throw std::runtime_error("header data corruption");
     }
     // Type mismatch.
-    if (expected != DataType::None && hdr.Type() != expected) {
+    if (expected != DataType::None && hdr.Type() != expected && hdr.Type() != DataType::Index) {
         return Object();
     }
     // Load object content.

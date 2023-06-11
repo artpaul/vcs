@@ -117,6 +117,15 @@ int ExecuteLog(int argc, char* argv[], const std::function<Workspace&()>& cb) {
 
             if (const auto id = repo.ResolveReference(args[0])) {
                 options.head = *id;
+            } else if (repo.HasPath(repo.GetCurrentHead(), args[0])) {
+                ;
+            } else {
+                fmt::print(
+                    stderr,
+                    "error: ambiguous argument '{}': unknown revision or path not in the working tree.\n",
+                    args[0]
+                );
+                return 1;
             }
         }
         if (opts.has("color")) {

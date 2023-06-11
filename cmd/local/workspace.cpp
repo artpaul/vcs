@@ -1,7 +1,9 @@
 #include "workspace.h"
 #include "config.h"
+#include "revparse.h"
 #include "worktree.h"
 
+#include <vcs/changes/revwalk.h>
 #include <vcs/changes/stage.h>
 #include <vcs/object/commit.h>
 #include <vcs/object/serialize.h>
@@ -14,6 +16,72 @@
 #include <chrono>
 
 namespace Vcs {
+
+class Workspace::Resolver : public ReferenceResolver {
+public:
+    explicit Resolver(const Workspace* w)
+        : workspace_(w) {
+    }
+
+private:
+    /** Gets nth ancestor of a commit. */
+    std::optional<HashId> DoGetNthAncestor(const HashId& id, uint64_t n) const final {
+        std::optional<HashId> result;
+
+        if (n == 0) {
+            return std::make_optional(id);
+        }
+
+        RevisionGraph::Walker(RevisionGraph(workspace_->Objects()))
+            .Push(id)
+            .SimplifyFirstParent(true)
+            .Walk([&, first = true](const RevisionGraph::Revision& r) mutable {
+                assert(n);
+                // Walking starts from the given id. Do not count it.
+                if (first) {
+                    first = false;
+                    return WalkAction::Continue;
+                }
+                if (--n == 0) {
+                    result = r.Id();
+                    return WalkAction::Stop;
+                } else {
+                    return WalkAction::Continue;
+                }
+            });
+
+        return result;
+    }
+
+    /** Gets nth parent of a commit. */
+    std::optional<HashId> DoGetNthParent(const HashId& id, const uint64_t n) const final {
+        if (n == 0) {
+            return id;
+        }
+        if (const auto c = workspace_->Objects().LoadCommit(id); c.Parents().size() >= n) {
+            return c.Parents()[n - 1];
+        } else {
+            return {};
+        }
+    }
+
+    /** Lookups object by name. */
+    std::optional<HashId> DoLookup(const std::string_view name) const final {
+        if (name == "HEAD") {
+            return workspace_->GetCurrentHead();
+        }
+        if (HashId::IsHex(name)) {
+            return HashId::FromHex(name);
+        }
+        if (const auto& branch = workspace_->GetBranch(name)) {
+            return branch->head;
+        }
+        return {};
+    }
+
+private:
+    const Workspace* workspace_;
+};
 
 Workspace::Workspace(const std::filesystem::path& bare_path, const std::filesystem::path& work_path)
     : Repository(bare_path) {
@@ -51,16 +119,7 @@ HashId Workspace::GetCurrentHead() const {
 }
 
 std::optional<HashId> Workspace::ResolveReference(const std::string_view ref) const {
-    if (HashId::IsHex(ref)) {
-        return HashId::FromHex(ref);
-    }
-    if (const auto& branch = branches_->Get(ref)) {
-        return branch->head;
-    }
-    if (ref == "HEAD") {
-        return GetCurrentHead();
-    }
-    return std::nullopt;
+    return Resolver(this).Resolve(ref);
 }
 
 HashId Workspace::Commit(const std::string& message, const std::vector<PathStatus>& changes) {

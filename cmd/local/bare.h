@@ -90,12 +90,12 @@ public:
     /**
      * Deletes a branch.
      */
-    void DeleteBranch(const std::string& name);
+    void DeleteBranch(const std::string_view name);
 
     /**
      * Returns state of the branch.
      */
-    std::optional<Branch> GetBranch(const std::string& name) const;
+    std::optional<Branch> GetBranch(const std::string_view name) const;
 
     /**
      * Lists local branches.
@@ -119,6 +119,8 @@ public:
      * @name History
      * @{
      */
+
+    bool HasPath(const HashId& rev, const std::string_view path) const;
 
     void Log(
         const LogOptions& options, const std::function<bool(const HashId& id, const Commit& commit)>& cb

@@ -108,11 +108,11 @@ Repository::Branch Repository::CreateBranch(const std::string& name, const HashI
     return branch;
 }
 
-void Repository::DeleteBranch(const std::string& name) {
+void Repository::DeleteBranch(const std::string_view name) {
     branches_->Delete(name);
 }
 
-std::optional<Repository::Branch> Repository::GetBranch(const std::string& name) const {
+std::optional<Repository::Branch> Repository::GetBranch(const std::string_view name) const {
     if (auto branch = branches_->Get(name)) {
         return branch.value();
     }
@@ -131,6 +131,10 @@ void Repository::ListBranches(const std::function<void(const Branch& branch)>& c
 
 const Config& Repository::GetConfig() const {
     return *config_;
+}
+
+bool Repository::HasPath(const HashId& rev, const std::string_view path) const {
+    return bool(StageArea(odb_, odb_.LoadCommit(rev).Tree()).GetEntry(path));
 }
 
 void Repository::Log(
