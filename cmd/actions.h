@@ -21,6 +21,8 @@ enum class Action {
     Init,
     /// Show commit log.
     Log,
+    /// Manage set of tracked repositories.
+    Remote,
     /// Remove files from the working tree.
     Remove,
     /// Reset current HEAD to the specified state.

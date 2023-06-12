@@ -77,7 +77,7 @@ Database::Impl::Impl(const std::filesystem::path& path, const Options& options)
 
     check(::mdb_env_create(&env_));
     check(::mdb_env_set_mapsize(env_, options.database_capacity));
-    check(::mdb_env_open(env_, path.c_str(), 0, 0664));
+    check(::mdb_env_open(env_, path.c_str(), MDB_NOTLS, 0664));
 }
 
 Database::Impl::~Impl() noexcept {

@@ -50,6 +50,19 @@ public:
         static std::string Save(const Branch& rec);
     };
 
+    struct Remote {
+        /// Name of a remote.
+        std::string name;
+        /// Location of a remote repository.
+        std::string fetch_uri;
+        /// Source repository is a git repository.
+        bool is_git = false;
+
+        static Remote Load(const std::string_view data);
+
+        static std::string Save(const Remote& rec);
+    };
+
     struct Workspace {
         /// Name of a workspace.
         std::string name;
@@ -142,6 +155,22 @@ public:
 
 public:
     /**
+     * @name Remotes
+     * @{
+     */
+
+    bool CreateRemote(const Remote& params);
+
+    /** Lists registered remotes. */
+    void ListRemotes(const std::function<void(const Remote&)>& cb) const;
+
+    /** Branches of the remote. */
+    std::unique_ptr<Database<Branch>> GetRemoteBranches(const std::string_view name) const;
+
+    /**@}*/
+
+public:
+    /**
      * @name Workspaces
      * @{
      */
@@ -165,6 +194,8 @@ protected:
     Datastore odb_;
     /// Local branches.
     std::unique_ptr<Database<Branch>> branches_;
+    /// Remotes.
+    std::unique_ptr<Database<Remote>> remotes_;
     /// Local workspaces.
     std::unique_ptr<Database<Workspace>> workspaces_;
 };

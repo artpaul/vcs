@@ -39,6 +39,26 @@ auto Repository::Branch::Save(const Branch& rec) -> std::string {
     return json.dump();
 }
 
+auto Repository::Remote::Load(const std::string_view data) -> Remote {
+    auto json = nlohmann::json::parse(data);
+
+    Remote remote;
+    remote.name = json["name"].get<std::string>();
+    remote.fetch_uri = json["fetch"]["uri"].get<std::string>();
+    remote.is_git = json["fetch"]["is_git"].get<bool>();
+    return remote;
+}
+
+auto Repository::Remote::Save(const Remote& rec) -> std::string {
+    auto json = nlohmann::json::object();
+
+    json["name"] = rec.name;
+    json["fetch"]["uri"] = rec.fetch_uri;
+    json["fetch"]["is_git"] = rec.is_git;
+
+    return json.dump();
+}
+
 auto Repository::Workspace::Load(const std::string_view data) -> Workspace {
     auto json = nlohmann::json::parse(data);
 
@@ -68,10 +88,13 @@ Repository::Repository(const std::filesystem::path& path)
     odb_ = Datastore::Make<Store::Loose>(path / "objects");
 
     // Open branch database.
-    branches_ = std::make_unique<Database<Branch>>(path / "db" / "branches");
+    branches_ = std::make_unique<Database<Branch>>(layout_.Database("branches"));
+
+    // Open remotes database.
+    remotes_ = std::make_unique<Database<Remote>>(layout_.Database("remotes"));
 
     // Open workspace database.
-    workspaces_ = std::make_unique<Database<Workspace>>(path / "db" / "workspaces");
+    workspaces_ = std::make_unique<Database<Workspace>>(layout_.Database("workspaces"));
 }
 
 Repository::~Repository() = default;
@@ -82,7 +105,9 @@ void Repository::Initialize(const std::filesystem::path& path) {
     std::filesystem::create_directory(path / "config");
     std::filesystem::create_directory(path / "db");
     std::filesystem::create_directory(path / "db" / "branches");
+    std::filesystem::create_directory(path / "db" / "remotes");
     std::filesystem::create_directory(path / "db" / "workspaces");
+    std::filesystem::create_directory(path / "remotes");
     std::filesystem::create_directory(path / "objects");
     std::filesystem::create_directory(path / "workspaces");
 
@@ -163,6 +188,36 @@ Datastore Repository::Objects() {
 
 const Datastore Repository::Objects() const {
     return odb_;
+}
+
+bool Repository::CreateRemote(const Remote& remote) {
+    // Check there is no remote with same name.
+    if (remotes_->Get(remote.name)) {
+        return false;
+    }
+
+    if (remotes_->Put(remote.name, remote)) {
+        // Create directory for branches database.
+        std::filesystem::create_directories(layout_.Remotes() / remote.name);
+        return true;
+    } else {
+        return false;
+    }
+}
+
+void Repository::ListRemotes(const std::function<void(const Remote&)>& cb) const {
+    if (!cb) {
+        return;
+    }
+    remotes_->Enumerate([&](const std::string_view, const Remote& remote) {
+        cb(remote);
+        return true;
+    });
+}
+
+std::unique_ptr<Database<Repository::Branch>> Repository::GetRemoteBranches(const std::string_view name
+) const {
+    return std::make_unique<Database<Branch>>(layout_.Remotes() / name);
 }
 
 bool Repository::CreateWorkspace(const Workspace& params, bool checkout) {

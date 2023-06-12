@@ -13,6 +13,7 @@ static const std::unordered_map<std::string_view, Action> actions = {
     {"diff", Action::Diff},
     {"init", Action::Init},
     {"log", Action::Log},
+    {"remote", Action::Remote},
     {"reset", Action::Reset},
     {"restore", Action::Restore},
     {"rm", Action::Remove},

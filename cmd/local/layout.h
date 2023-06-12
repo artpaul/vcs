@@ -25,6 +25,10 @@ public:
         return root_ / "db";
     }
 
+    std::filesystem::path Database(const std::string& name) const {
+        return root_ / "db" / name;
+    }
+
 public:
     /**
      * Locations of loose object storage.
@@ -38,6 +42,14 @@ public:
      */
     std::filesystem::path Packs() const {
         return root_ / "store" / "packs";
+    }
+
+public:
+    /**
+     * Location of remotes.
+     */
+    std::filesystem::path Remotes() const {
+        return root_ / "remotes";
     }
 
 public:

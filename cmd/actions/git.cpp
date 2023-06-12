@@ -138,9 +138,33 @@ int ExecuteConvert(int argc, char* argv[], const std::function<Workspace&()>&) {
         }
     }
 
+    // Create remote.
+    {
+        Repository::Remote remote;
+        remote.name = "origin";
+        remote.fetch_uri = fmt::format("file://{}", options.path.string());
+        remote.is_git = true;
+
+        if (!repo.CreateRemote(remote)) {
+            fmt::print(stderr, "error: cannot create remote '{}'\n", remote.name);
+            return 1;
+        }
+
+        if (auto branches = repo.GetRemoteBranches(remote.name)) {
+            Repository::Branch branch;
+            branch.head = last;
+            branch.name = options.branch;
+            branches->Put(options.branch, branch);
+        } else {
+            fmt::print(stderr, "error: cannot get remote branches\n");
+            return 1;
+        }
+    }
+
+    // Create local branch.
     repo.CreateBranch(options.branch, last);
 
-    // Create and set a branch.
+    // Check the branch was created.
     if (const auto& b = repo.GetBranch(options.branch)) {
         fmt::print("branch '{}' set to {}\n", options.branch, b->head);
     } else {

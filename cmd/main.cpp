@@ -15,6 +15,7 @@ extern int ExecuteDump(int argc, char* argv[], const std::function<Workspace&()>
 extern int ExecuteGit(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteInit(int argc, char* argv[]);
 extern int ExecuteLog(int argc, char* argv[], const std::function<Workspace&()>& cb);
+extern int ExecuteRemote(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteReset(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteRestore(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteShow(int argc, char* argv[], const std::function<Workspace&()>& cb);
@@ -118,6 +119,8 @@ static int Main(int argc, char* argv[]) {
             return ExecuteInit(argc, argv);
         case Action::Log:
             return ExecuteLog(argc, argv, get_workspace);
+        case Action::Remote:
+            return ExecuteRemote(argc, argv, get_workspace);
         case Action::Remove:
             break;
         case Action::Reset:
