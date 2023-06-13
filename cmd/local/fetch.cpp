@@ -24,12 +24,18 @@ public:
         }
     }
 
-    bool DoFetch(const std::function<void(const std::string_view)> cb) final {
+    bool DoFetch(std::function<void(const std::string_view)> cb) final {
         auto odb = repo_->Objects();
         // Set of commits to hide during conversion.
         std::unordered_set<HashId> hide;
         // List of remote branches to update.
         std::vector<decltype(remote_branches_)::iterator> to_update;
+
+        // Ensure cb is initialized.
+        if (!bool(cb)) {
+            cb = [](const std::string_view) {
+            };
+        }
 
         // Open git repository.
         Git::Converter converter(path_, Git::Converter::Options());
@@ -112,24 +118,22 @@ public:
             HashId last;
             // Converting commits.
             for (const auto& id : ids) {
-                // fmt::print("converting git {}...\n", id);
                 auto collect = Store::Collect::Make();
+                cb(fmt::format("converting git {}...", id));
                 last = converter.ConvertCommit(id, odb.Chain(collect));
 
-                if (!last) {
-                    // fmt::print(stderr, "error: cannot convert {}\n", id);
-                    return false;
-                } else if (cb) {
+                if (last) {
                     cb(fmt::format(
                         "converted {} as {}; objects in commit: {}", id, last, collect->GetIds().size()
                     ));
+                } else {
+                    return false;
                 }
 
                 // Save remap to database.
                 if (const auto status = remap->Put(id.ToBytes(), Git::Remap{.git = id, .vcs = last})) {
                     ;
                 } else {
-                    // fmt::print(stderr, "error: cannot write remap '{}'\n", status.Message());
                     return false;
                 }
             }
