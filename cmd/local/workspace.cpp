@@ -10,6 +10,7 @@
 #include <vcs/store/memory.h>
 
 #include <util/file.h>
+#include <util/split.h>
 
 #include <contrib/fmt/fmt/std.h>
 
@@ -73,8 +74,19 @@ private:
         if (HashId::IsHex(name)) {
             return HashId::FromHex(name);
         }
-        if (const auto& branch = workspace_->GetBranch(name)) {
+        // Local branch.
+        if (const auto branch = workspace_->GetBranch(name)) {
             return branch->head;
+        }
+        // Remote branch.
+        if (const auto parts = SplitPath(name); parts.size() > 1) {
+            if (const auto branches = workspace_->GetRemoteBranches(parts[0])) {
+                const auto branch_name = fmt::format("{}", fmt::join(parts.begin() + 1, parts.end(), "/"));
+
+                if (const auto branch = branches->Get(branch_name)) {
+                    return branch->head;
+                }
+            }
         }
         return {};
     }
@@ -107,11 +119,11 @@ Workspace::Workspace(const std::filesystem::path& bare_path, const std::filesyst
 
 Workspace::~Workspace() = default;
 
-auto Workspace::GetCurrentBranch() const -> Branch {
+auto Workspace::GetCurrentBranch() const -> BranchInfo {
     if (auto branch = branches_->Get(StringFromFile(state_path_ / "HEAD", true))) {
         return *branch;
     }
-    return Branch();
+    return BranchInfo();
 }
 
 HashId Workspace::GetCurrentHead() const {

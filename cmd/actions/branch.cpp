@@ -9,6 +9,7 @@
 #include <contrib/fmt/fmt/format.h>
 
 #include <functional>
+#include <map>
 #include <vector>
 
 namespace Vcs {
@@ -22,6 +23,8 @@ struct Options {
     bool force = false;
     /// List branches.
     bool list = false;
+    /// Act on remotes.
+    bool remotes = false;
     /// Delete branch.
     bool remove = false;
     /// Show commit message.
@@ -78,6 +81,78 @@ int DeleteBranches(const Options& options, Workspace& repo) {
     return 0;
 }
 
+int ListRemoteBranches(const Options& options, const Workspace& repo) {
+    const auto name_style = [] {
+        if (util::is_atty(stdout)) {
+            return fmt::fg(fmt::terminal_color::red);
+        } else {
+            return fmt::text_style();
+        }
+    };
+
+    std::map<std::string, std::vector<BranchInfo>> remotes;
+
+    repo.ListRemotes([&](const RemoteInfo& remote) {
+        remotes.emplace(remote.name, std::vector<BranchInfo>());
+        return true;
+    });
+
+    for (auto& [name, branches] : remotes) {
+        if (const auto& db = repo.GetRemoteBranches(name)) {
+            db->Enumerate([&](const std::string_view, const BranchInfo& branch) {
+                branches.push_back(branch);
+                return true;
+            });
+        }
+        // Ensure branches are ordered properly.
+        std::sort(branches.begin(), branches.end(), [](const auto& a, const auto& b) {
+            return a.name < b.name;
+        });
+    }
+
+    // Print branch names with extra information.
+    if (options.show_commit) {
+        auto odb = repo.Objects().Cache(Store::MemoryCache::Make());
+        auto longest_name = size_t(0);
+        // Calculate size of longest name.
+        for (const auto& [remote, branches] : remotes) {
+            for (const auto& b : branches) {
+                longest_name = std::max(longest_name, b.name.size() + remote.size() + 1);
+            }
+        }
+        // Print branches.
+        for (const auto& [remote, branches] : remotes) {
+            for (const auto& b : branches) {
+                fmt::print(
+                    "  {:<{}} {} {}\n",
+                    // Styled name of the branch.
+                    fmt::styled(fmt::format("{}/{}", remote, b.name), name_style()),
+                    // Padding for branch name.
+                    longest_name,
+                    // Head commit.
+                    b.head,
+                    // Title of the head commit.
+                    MessageTitle(odb.LoadCommit(b.head).Message())
+                );
+            }
+        }
+        return 0;
+    }
+
+    // Print branch names concisely.
+    for (const auto& [remote, branches] : remotes) {
+        for (const auto& b : branches) {
+            fmt::print(
+                "  {}\n",
+                // Styled name of the branch.
+                fmt::styled(fmt::format("{}/{}", remote, b.name), name_style())
+            );
+        }
+    }
+
+    return 0;
+}
+
 int ListBranches(const Options& options, const Workspace& repo) {
     const auto name_style = [] {
         if (util::is_atty(stdout)) {
@@ -88,9 +163,9 @@ int ListBranches(const Options& options, const Workspace& repo) {
     };
 
     const auto& current = repo.GetCurrentBranch();
-    std::vector<Repository::Branch> branches;
+    std::vector<BranchInfo> branches;
 
-    repo.ListBranches([&](const Repository::Branch& branch) { branches.push_back(branch); });
+    repo.ListBranches([&](const BranchInfo& branch) { branches.push_back(branch); });
     // Ensure branches are ordered properly.
     std::sort(branches.begin(), branches.end(), [](const auto& a, const auto& b) {
         return a.name < b.name;
@@ -154,7 +229,11 @@ int Execute(const Options& options, Workspace& repo) {
         return DeleteBranches(options, repo);
     }
     if (options.list || options.names.empty()) {
-        return ListBranches(options, repo);
+        if (options.remotes) {
+            return ListRemoteBranches(options, repo);
+        } else {
+            return ListBranches(options, repo);
+        }
     }
     return CreateBranch(options, repo);
 };
@@ -167,10 +246,16 @@ int ExecuteBranch(int argc, char* argv[], const std::function<Workspace&()>& cb)
     {
         cxxopts::options spec(fmt::format("vcs {}", argv[0]));
         spec.add_options(
-            "",
+            "Generic options",
             {
                 {"h,help", "print help"},
                 {"v,verbose", "show hash and subject", cxxopts::value(options.show_commit)},
+                {"r,remotes", "act on remote-tracking branches", cxxopts::value(options.remotes)},
+            }
+        );
+        spec.add_options(
+            "Specific actions",
+            {
                 {"d,delete", "delete branch", cxxopts::value(options.remove)},
                 {"f,force", "force creation, move/rename, deletion", cxxopts::value(options.force)},
                 {"l,list", "list branch names", cxxopts::value(options.list)},

@@ -37,7 +37,7 @@ public:
     /**
      * Returns state of the current branch.
      */
-    Branch GetCurrentBranch() const;
+    BranchInfo GetCurrentBranch() const;
 
     /** */
     HashId GetCurrentHead() const;

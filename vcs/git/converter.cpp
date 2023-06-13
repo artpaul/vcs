@@ -13,6 +13,8 @@
 namespace Vcs::Git {
 namespace {
 
+static_assert(sizeof(git_oid) == sizeof(HashId().Data()));
+
 void CheckError(int error_code, const char* action) {
     if (const git_error* error = git_error_last()) {
         throw std::runtime_error(fmt::format(
@@ -173,7 +175,15 @@ public:
 
     HashId ConvertCommit(const HashId& id, Datastore odb);
 
-    void ListCommits(const std::string& head, const std::function<WalkAction(const HashId&)>& cb) const;
+    git_oid GetHead(const std::string& branch) const;
+
+    void ListBranches(const std::function<void(const std::string&, const HashId&)>& cb);
+
+    void ListCommits(
+        const std::vector<git_oid>& heads,
+        const std::unordered_set<HashId>& hide,
+        const std::function<WalkAction(const HashId&)>& cb
+    ) const;
 
 private:
     Options options_;
@@ -207,7 +217,6 @@ HashId Converter::Impl::ConvertCommit(const HashId& id, Datastore odb) {
     git_oid oid;
 
     assert(remap_);
-    static_assert(sizeof(oid.id) == sizeof(id.Data()));
 
     std::memcpy(oid.id, id.Data(), sizeof(oid.id));
 
@@ -354,20 +363,54 @@ HashId Converter::Impl::ConvertCommit(const HashId& id, Datastore odb) {
     return stage_odb.Put(DataType::Commit, content).first;
 }
 
-void Converter::Impl::ListCommits(
-    const std::string& head, const std::function<WalkAction(const HashId&)>& cb
-) const {
+git_oid Converter::Impl::GetHead(const std::string& branch) const {
     std::unique_ptr<git_reference, std::function<void(git_reference*)>> ref(
         [&]() {
             git_reference* ref{};
             CheckError(
-                ::git_branch_lookup(&ref, repo_, head.c_str(), GIT_BRANCH_LOCAL), "reference lookup"
+                ::git_branch_lookup(&ref, repo_, branch.c_str(), GIT_BRANCH_LOCAL), "reference lookup"
             );
             return ref;
         }(),
         [](git_reference* r) { ::git_reference_free(r); }
     );
 
+    git_oid oid;
+
+    CheckError(git_reference_name_to_id(&oid, repo_, git_reference_name(ref.get())), "resolve reference");
+
+    return oid;
+}
+
+void Converter::Impl::ListBranches(const std::function<void(const std::string&, const HashId&)>& cb) {
+    std::unique_ptr<git_branch_iterator, std::function<void(git_branch_iterator*)>> iter(
+        [&]() {
+            git_branch_iterator* r{};
+            CheckError(::git_branch_iterator_new(&r, repo_, GIT_BRANCH_LOCAL), "branch iterator");
+            return r;
+        }(),
+        [](git_branch_iterator* r) { ::git_branch_iterator_free(r); }
+    );
+
+    git_reference* ref;
+    git_branch_t type;
+
+    while (git_branch_next(&ref, &type, iter.get()) == 0) {
+        const char* name;
+
+        if (git_branch_name(&name, ref) != 0) {
+            continue;
+        }
+
+        cb(name, HashId::FromBytes(git_reference_target(ref)->id, sizeof(git_oid)));
+    }
+}
+
+void Converter::Impl::ListCommits(
+    const std::vector<git_oid>& heads,
+    const std::unordered_set<HashId>& hide,
+    const std::function<WalkAction(const HashId&)>& cb
+) const {
     std::unique_ptr<git_revwalk, std::function<void(git_revwalk*)>> walk(
         [&]() {
             git_revwalk* r{};
@@ -377,11 +420,18 @@ void Converter::Impl::ListCommits(
         [](git_revwalk* r) { ::git_revwalk_free(r); }
     );
 
-    git_oid oid;
-
-    CheckError(git_reference_name_to_id(&oid, repo_, git_reference_name(ref.get())), "resolve reference");
     git_revwalk_sorting(walk.get(), GIT_SORT_TOPOLOGICAL | GIT_SORT_REVERSE);
-    git_revwalk_push(walk.get(), &oid);
+
+    for (const auto& oid : heads) {
+        git_revwalk_push(walk.get(), &oid);
+    }
+    for (const auto& id : hide) {
+        git_oid oid;
+        std::memcpy(oid.id, id.Data(), sizeof(oid.id));
+        git_revwalk_hide(walk.get(), &oid);
+    }
+
+    git_oid oid;
 
     while ((git_revwalk_next(&oid, walk.get())) == 0) {
         switch (cb(HashId::FromBytes(oid.id, sizeof(oid.id)))) {
@@ -411,9 +461,21 @@ HashId Converter::ConvertCommit(const HashId& id, Datastore odb) {
     return impl_->ConvertCommit(id, std::move(odb));
 }
 
+void Converter::ListBranches(const std::function<void(const std::string&, const HashId&)>& cb) {
+    impl_->ListBranches(cb);
+}
+
 void Converter::ListCommits(const std::string& head, const std::function<WalkAction(const HashId&)>& cb)
     const {
-    impl_->ListCommits(head, cb);
+    impl_->ListCommits({impl_->GetHead(head)}, {}, cb);
+}
+
+void Converter::ListCommits(
+    const std::string& head,
+    const std::unordered_set<HashId>& hide,
+    const std::function<WalkAction(const HashId&)>& cb
+) const {
+    impl_->ListCommits({impl_->GetHead(head)}, hide, cb);
 }
 
 } // namespace Vcs::Git

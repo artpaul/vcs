@@ -40,7 +40,7 @@ int InitializeWorkspace(const Options& options) {
     // Create starting point of the history.
     repo.CreateBranch(options.branch, HashId());
 
-    const auto ws = Repository::Workspace{
+    const auto ws = WorkspaceInfo{
         .name = "main",
         .path = options.path,
         .branch = options.branch,

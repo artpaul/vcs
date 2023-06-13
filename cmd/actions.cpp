@@ -11,6 +11,7 @@ static const std::unordered_map<std::string_view, Action> actions = {
     {"commit", Action::Commit},
     {"config", Action::Config},
     {"diff", Action::Diff},
+    {"fetch", Action::Fetch},
     {"init", Action::Init},
     {"log", Action::Log},
     {"remote", Action::Remote},

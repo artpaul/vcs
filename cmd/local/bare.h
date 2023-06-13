@@ -11,6 +11,7 @@
 namespace Vcs {
 
 class Config;
+class Fetcher;
 
 struct LogOptions {
     std::unordered_set<HashId> roots;
@@ -37,47 +38,46 @@ struct LogOptions {
     }
 };
 
+struct BranchInfo {
+    /// Name of a branch.
+    std::string name;
+    /// Current commit.
+    HashId head;
+
+    static BranchInfo Load(const std::string_view data);
+
+    static std::string Save(const BranchInfo& rec);
+};
+
+struct RemoteInfo {
+    /// Name of a remote.
+    std::string name;
+    /// Location of a remote repository.
+    std::string fetch_uri;
+    /// Source repository is a git repository.
+    bool is_git = false;
+
+    static RemoteInfo Load(const std::string_view data);
+
+    static std::string Save(const RemoteInfo& rec);
+};
+
+struct WorkspaceInfo {
+    /// Name of a workspace.
+    std::string name;
+    /// Location of working tree.
+    std::filesystem::path path;
+    /// Current branch.
+    std::string branch;
+    /// Base of working tree.
+    HashId tree;
+
+    static WorkspaceInfo Load(const std::string_view data);
+
+    static std::string Save(const WorkspaceInfo& rec);
+};
+
 class Repository {
-public:
-    struct Branch {
-        /// Name of a branch.
-        std::string name;
-        /// Current commit.
-        HashId head;
-
-        static Branch Load(const std::string_view data);
-
-        static std::string Save(const Branch& rec);
-    };
-
-    struct Remote {
-        /// Name of a remote.
-        std::string name;
-        /// Location of a remote repository.
-        std::string fetch_uri;
-        /// Source repository is a git repository.
-        bool is_git = false;
-
-        static Remote Load(const std::string_view data);
-
-        static std::string Save(const Remote& rec);
-    };
-
-    struct Workspace {
-        /// Name of a workspace.
-        std::string name;
-        /// Location of working tree.
-        std::filesystem::path path;
-        /// Current branch.
-        std::string branch;
-        /// Base of working tree.
-        HashId tree;
-
-        static Workspace Load(const std::string_view data);
-
-        static std::string Save(const Workspace& rec);
-    };
-
 public:
     Repository(const std::filesystem::path& path);
 
@@ -98,7 +98,7 @@ public:
     /**
      * Creates a branch which will be point to the given commit.
      */
-    Branch CreateBranch(const std::string& name, const HashId head);
+    BranchInfo CreateBranch(const std::string& name, const HashId head);
 
     /**
      * Deletes a branch.
@@ -108,12 +108,12 @@ public:
     /**
      * Returns state of the branch.
      */
-    std::optional<Branch> GetBranch(const std::string_view name) const;
+    std::optional<BranchInfo> GetBranch(const std::string_view name) const;
 
     /**
      * Lists local branches.
      */
-    void ListBranches(const std::function<void(const Branch& branch)>& cb) const;
+    void ListBranches(const std::function<void(const BranchInfo& branch)>& cb) const;
 
     /**@}*/
 
@@ -159,13 +159,16 @@ public:
      * @{
      */
 
-    bool CreateRemote(const Remote& params);
+    bool CreateRemote(const RemoteInfo& params);
 
     /** Lists registered remotes. */
-    void ListRemotes(const std::function<void(const Remote&)>& cb) const;
+    void ListRemotes(const std::function<void(const RemoteInfo&)>& cb) const;
 
     /** Branches of the remote. */
-    std::unique_ptr<Database<Branch>> GetRemoteBranches(const std::string_view name) const;
+    std::unique_ptr<Database<BranchInfo>> GetRemoteBranches(const std::string_view name) const;
+
+    /** Fetcher for the remote. */
+    std::unique_ptr<Fetcher> GetRemoteFetcher(const std::string_view name) const;
 
     /**@}*/
 
@@ -175,12 +178,12 @@ public:
      * @{
      */
 
-    bool CreateWorkspace(const Workspace& params, bool checkout);
+    bool CreateWorkspace(const WorkspaceInfo& params, bool checkout);
 
-    std::optional<Workspace> GetWorkspace(const std::string& name) const;
+    std::optional<WorkspaceInfo> GetWorkspace(const std::string& name) const;
 
     /** Lists registered workspaces. */
-    void ListWorkspaces(const std::function<const Workspace&>& cb) const;
+    void ListWorkspaces(const std::function<const WorkspaceInfo&>& cb) const;
 
     /**@}*/
 
@@ -193,11 +196,11 @@ protected:
     /// Object storage.
     Datastore odb_;
     /// Local branches.
-    std::unique_ptr<Database<Branch>> branches_;
+    std::unique_ptr<Database<BranchInfo>> branches_;
     /// Remotes.
-    std::unique_ptr<Database<Remote>> remotes_;
+    std::unique_ptr<Database<RemoteInfo>> remotes_;
     /// Local workspaces.
-    std::unique_ptr<Database<Workspace>> workspaces_;
+    std::unique_ptr<Database<WorkspaceInfo>> workspaces_;
 };
 
 } // namespace Vcs

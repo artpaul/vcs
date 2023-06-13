@@ -17,6 +17,8 @@ enum class Action {
     Config,
     /// Show changes between commits, commit and working tree, etc.
     Diff,
+    /// Download objects and refs from another repository.
+    Fetch,
     /// Create an empty repository.
     Init,
     /// Show commit log.

@@ -1,6 +1,6 @@
+#include <cmd/local/fetch.h>
 #include <cmd/local/workspace.h>
-#include <vcs/git/converter.h>
-#include <vcs/store/collect.h>
+#include <vcs/git/types.h>
 
 #include <contrib/cxxopts/cxxopts.hpp>
 #include <contrib/fmt/fmt/format.h>
@@ -9,32 +9,10 @@
 
 #include <unordered_map>
 
+static const std::string kDefaultRemote("origin");
+
 namespace Vcs {
 namespace {
-
-struct Remap {
-    HashId git;
-    HashId vcs;
-
-    static Remap Load(const std::string_view data) {
-        auto json = nlohmann::json::parse(data);
-        Remap remap;
-
-        remap.git = HashId::FromHex(json["git"].get<std::string>());
-        remap.vcs = HashId::FromHex(json["vcs"].get<std::string>());
-
-        return remap;
-    }
-
-    static std::string Save(const Remap& rec) {
-        auto json = nlohmann::json::object();
-
-        json["git"] = rec.git.ToHex();
-        json["vcs"] = rec.vcs.ToHex();
-
-        return json.dump();
-    }
-};
 
 int ExecuteConvert(int argc, char* argv[], const std::function<Workspace&()>&) {
     struct {
@@ -51,7 +29,7 @@ int ExecuteConvert(int argc, char* argv[], const std::function<Workspace&()>&) {
             {
                 {"h,help", "show help"},
                 {"git", "path to git repository", cxxopts::value<std::string>()},
-                {"b,branch", "branch to convert", cxxopts::value(options.branch)->default_value("master")},
+                {"b,branch", "branch to convert", cxxopts::value(options.branch)},
                 {"bare", "create a bare repository", cxxopts::value(options.bare)},
                 {"path", "path to target repository", cxxopts::value<std::string>()},
             }
@@ -82,25 +60,6 @@ int ExecuteConvert(int argc, char* argv[], const std::function<Workspace&()>&) {
         }
     }
 
-    Git::Converter converter(options.path, Git::Converter::Options());
-
-    // Ordered list of git commits to convert.
-    std::vector<HashId> ids;
-    std::unordered_map<HashId, HashId> remap;
-
-    // Setup remap callback.
-    converter.SetRemap([&](const HashId& id) -> HashId {
-        if (auto ri = remap.find(id); ri != remap.end()) {
-            return ri->second;
-        }
-        return HashId();
-    });
-    // Populate list of commits.
-    converter.ListCommits(options.branch, [&](const HashId& id) {
-        ids.push_back(id);
-        return WalkAction::Continue;
-    });
-
     const auto bare_path = options.bare ? options.target_path : options.target_path / ".vcs";
 
     // Initialize target repository.
@@ -114,34 +73,12 @@ int ExecuteConvert(int argc, char* argv[], const std::function<Workspace&()>&) {
     }
 
     Repository repo(bare_path);
-    Database<Remap> db(repo.GetLayout().Databases() / "git", Lmdb::Options{.create_if_missing = true});
-
-    HashId last;
-    // Converting commits.
-    for (const auto& id : ids) {
-        fmt::print("converting git {}...\n", id);
-        auto collect = Store::Collect::Make();
-        last = converter.ConvertCommit(id, repo.Objects().Chain(collect));
-
-        if (!last) {
-            fmt::print(stderr, "error: cannot convert {}\n", id);
-            return 1;
-        } else {
-            fmt::print("converted {} as {}; objects in commit: {}\n", id, last, collect->GetIds().size());
-        }
-
-        remap.emplace(id, last);
-        // Save remap to database.
-        if (const auto status = db.Put(id.ToBytes(), Remap{.git = id, .vcs = last}); !status) {
-            fmt::print(stderr, "error: cannot write remap '{}'\n", status.Message());
-            return 1;
-        }
-    }
+    std::optional<std::string> branch_name;
 
     // Create remote.
     {
-        Repository::Remote remote;
-        remote.name = "origin";
+        RemoteInfo remote;
+        remote.name = kDefaultRemote;
         remote.fetch_uri = fmt::format("file://{}", options.path.string());
         remote.is_git = true;
 
@@ -149,35 +86,77 @@ int ExecuteConvert(int argc, char* argv[], const std::function<Workspace&()>&) {
             fmt::print(stderr, "error: cannot create remote '{}'\n", remote.name);
             return 1;
         }
+    }
 
-        if (auto branches = repo.GetRemoteBranches(remote.name)) {
-            Repository::Branch branch;
-            branch.head = last;
-            branch.name = options.branch;
-            branches->Put(options.branch, branch);
-        } else {
-            fmt::print(stderr, "error: cannot get remote branches\n");
+    // Convert commits from the git repository to the system format.
+    if (auto fetcher = repo.GetRemoteFetcher(kDefaultRemote)) {
+        const auto cb = [](const std::string_view msg) {
+            fmt::print("{}\n", msg);
+        };
+
+        if (!fetcher->Fetch(cb)) {
+            fmt::print(stderr, "error: cannot fetch from remote '{}'\n", kDefaultRemote);
             return 1;
         }
+    } else {
+        fmt::print(stderr, "error: cannot get fetcher for '{}'\n", kDefaultRemote);
+        return 1;
     }
 
     // Create local branch.
-    repo.CreateBranch(options.branch, last);
+    if (auto branches = repo.GetRemoteBranches(kDefaultRemote)) {
+        const auto make_branch_names = [&]() -> std::vector<std::string> {
+            if (options.branch.size()) {
+                return {options.branch};
+            } else {
+                return {"main", "master", "trunk"};
+            }
+        };
+
+        for (const auto& name : make_branch_names()) {
+            if (const auto ret = branches->Get(name)) {
+                // Create local branch with the choosen name.
+                repo.CreateBranch(name, ret->head);
+                // Use the name further.
+                branch_name = name;
+                break;
+            }
+        }
+
+        if (!bool(branch_name)) {
+            if (options.branch.empty()) {
+                fmt::print(
+                    stderr,
+                    "error: none of branch named 'main', 'master' or 'trunk' cannot be located in "
+                    "remote '{}'\n",
+                    kDefaultRemote
+                );
+            } else {
+                fmt::print(
+                    stderr, "error: cannot locate remote branch '{}/{}'\n", kDefaultRemote, options.branch
+                );
+            }
+            return 1;
+        }
+    } else {
+        fmt::print(stderr, "error: cannot get remote branches\n");
+        return 1;
+    }
 
     // Check the branch was created.
-    if (const auto& b = repo.GetBranch(options.branch)) {
-        fmt::print("branch '{}' set to {}\n", options.branch, b->head);
+    if (const auto& b = repo.GetBranch(*branch_name)) {
+        fmt::print("branch '{}' set to {}\n", *branch_name, b->head);
     } else {
-        fmt::print(stderr, "error: cannot get branch '{}'\n", options.branch);
+        fmt::print(stderr, "error: cannot get branch '{}'\n", *branch_name);
         return 1;
     }
 
     // Create a workspace if requested.
     if (!options.bare) {
-        const auto ws = Repository::Workspace{
+        const auto ws = WorkspaceInfo{
             .name = "main",
             .path = options.target_path,
-            .branch = options.branch,
+            .branch = *branch_name,
         };
 
         if (!repo.CreateWorkspace(ws, true)) {
@@ -220,7 +199,7 @@ int ExecuteOid(int argc, char* argv[], const std::function<Workspace&()>& cb) {
         }
     }
 
-    Database<Remap> db(cb().GetLayout().Databases() / "git", Lmdb::Options());
+    Database<Git::Remap> db(cb().GetLayout().Database("git"), Lmdb::Options());
 
     if (const auto rec = db.Get(options.oid.ToBytes())) {
         fmt::print("{}\n", rec.value().vcs);

@@ -8,6 +8,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <unordered_set>
 
 namespace Vcs::Git {
 
@@ -45,9 +46,23 @@ public:
     HashId ConvertCommit(const HashId& id, Datastore odb);
 
     /**
+     * Lists local branches.
+     */
+    void ListBranches(const std::function<void(const std::string&, const HashId&)>& cb);
+
+    /**
      * Lists commits reachable from the head in order suitable for conversion.
      */
     void ListCommits(const std::string& head, const std::function<WalkAction(const HashId&)>& cb) const;
+
+    /**
+     * Lists commits reachable from the head in order suitable for conversion.
+     */
+    void ListCommits(
+        const std::string& head,
+        const std::unordered_set<HashId>& hide,
+        const std::function<WalkAction(const HashId&)>& cb
+    ) const;
 
 private:
     class Impl;

@@ -12,6 +12,7 @@ extern int ExecuteCommit(int argc, char* argv[], const std::function<Workspace&(
 extern int ExecuteConfig(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteDiff(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteDump(int argc, char* argv[], const std::function<Workspace&()>& cb);
+extern int ExecuteFetch(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteGit(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteInit(int argc, char* argv[]);
 extern int ExecuteLog(int argc, char* argv[], const std::function<Workspace&()>& cb);
@@ -115,6 +116,8 @@ static int Main(int argc, char* argv[]) {
             return ExecuteConfig(argc, argv, get_workspace);
         case Action::Diff:
             return ExecuteDiff(argc, argv, get_workspace);
+        case Action::Fetch:
+            return ExecuteFetch(argc, argv, get_workspace);
         case Action::Init:
             return ExecuteInit(argc, argv);
         case Action::Log:

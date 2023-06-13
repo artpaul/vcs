@@ -1,12 +1,9 @@
 
 #include <cmd/local/workspace.h>
-#include <vcs/changes/changelist.h>
-#include <vcs/changes/path.h>
 
 #include <util/tty.h>
 
 #include <contrib/cxxopts/cxxopts.hpp>
-#include <contrib/fmt/fmt/color.h>
 #include <contrib/fmt/fmt/format.h>
 
 #include <functional>
@@ -20,7 +17,7 @@ struct Options {
 };
 
 int Execute(const Options& options, const Workspace& repo) {
-    repo.ListRemotes([&](const Workspace::Remote& remote) {
+    repo.ListRemotes([&](const RemoteInfo& remote) {
         if (options.verbose) {
             fmt::print("{}  {}{}\n", remote.name, remote.fetch_uri, remote.is_git ? " (git)" : "");
         } else {

@@ -1,5 +1,6 @@
 #include "bare.h"
 #include "config.h"
+#include "fetch.h"
 #include "worktree.h"
 
 #include <vcs/changes/revwalk.h>
@@ -23,14 +24,14 @@ nlohmann::json GetDefaultConfig() {
 
 } // namespace
 
-auto Repository::Branch::Load(const std::string_view data) -> Branch {
+auto BranchInfo::Load(const std::string_view data) -> BranchInfo {
     auto json = nlohmann::json::parse(data);
 
-    return Branch{
+    return BranchInfo{
         .name = json["name"].get<std::string>(), .head = HashId::FromHex(json["head"].get<std::string>())};
 }
 
-auto Repository::Branch::Save(const Branch& rec) -> std::string {
+auto BranchInfo::Save(const BranchInfo& rec) -> std::string {
     auto json = nlohmann::json::object();
 
     json["name"] = rec.name;
@@ -39,17 +40,17 @@ auto Repository::Branch::Save(const Branch& rec) -> std::string {
     return json.dump();
 }
 
-auto Repository::Remote::Load(const std::string_view data) -> Remote {
+auto RemoteInfo::Load(const std::string_view data) -> RemoteInfo {
     auto json = nlohmann::json::parse(data);
 
-    Remote remote;
+    RemoteInfo remote;
     remote.name = json["name"].get<std::string>();
     remote.fetch_uri = json["fetch"]["uri"].get<std::string>();
     remote.is_git = json["fetch"]["is_git"].get<bool>();
     return remote;
 }
 
-auto Repository::Remote::Save(const Remote& rec) -> std::string {
+auto RemoteInfo::Save(const RemoteInfo& rec) -> std::string {
     auto json = nlohmann::json::object();
 
     json["name"] = rec.name;
@@ -59,13 +60,13 @@ auto Repository::Remote::Save(const Remote& rec) -> std::string {
     return json.dump();
 }
 
-auto Repository::Workspace::Load(const std::string_view data) -> Workspace {
+auto WorkspaceInfo::Load(const std::string_view data) -> WorkspaceInfo {
     auto json = nlohmann::json::parse(data);
 
-    return Workspace{.name = json["name"].get<std::string>(), .path = json["path"].get<std::string>()};
+    return WorkspaceInfo{.name = json["name"].get<std::string>(), .path = json["path"].get<std::string>()};
 }
 
-auto Repository::Workspace::Save(const Workspace& rec) -> std::string {
+auto WorkspaceInfo::Save(const WorkspaceInfo& rec) -> std::string {
     auto json = nlohmann::json::object();
 
     json["name"] = rec.name;
@@ -88,13 +89,13 @@ Repository::Repository(const std::filesystem::path& path)
     odb_ = Datastore::Make<Store::Loose>(path / "objects");
 
     // Open branch database.
-    branches_ = std::make_unique<Database<Branch>>(layout_.Database("branches"));
+    branches_ = std::make_unique<Database<BranchInfo>>(layout_.Database("branches"));
 
     // Open remotes database.
-    remotes_ = std::make_unique<Database<Remote>>(layout_.Database("remotes"));
+    remotes_ = std::make_unique<Database<RemoteInfo>>(layout_.Database("remotes"));
 
     // Open workspace database.
-    workspaces_ = std::make_unique<Database<Workspace>>(layout_.Database("workspaces"));
+    workspaces_ = std::make_unique<Database<WorkspaceInfo>>(layout_.Database("workspaces"));
 }
 
 Repository::~Repository() = default;
@@ -112,17 +113,17 @@ void Repository::Initialize(const std::filesystem::path& path) {
     std::filesystem::create_directory(path / "workspaces");
 
     // Initialize branch database.
-    std::make_unique<Database<Branch>>(path / "db" / "branches").reset(nullptr);
+    std::make_unique<Database<BranchInfo>>(path / "db" / "branches").reset(nullptr);
     // Initialize workspace database.
-    std::make_unique<Database<Workspace>>(path / "db" / "workspaces").reset(nullptr);
+    std::make_unique<Database<WorkspaceInfo>>(path / "db" / "workspaces").reset(nullptr);
 }
 
 Layout Repository::GetLayout() const {
     return layout_;
 }
 
-Repository::Branch Repository::CreateBranch(const std::string& name, const HashId head) {
-    auto branch = Branch{.name = name, .head = head};
+BranchInfo Repository::CreateBranch(const std::string& name, const HashId head) {
+    auto branch = BranchInfo{.name = name, .head = head};
 
     if (auto status = branches_->Put(name, branch); !status) {
         throw std::runtime_error(
@@ -137,18 +138,18 @@ void Repository::DeleteBranch(const std::string_view name) {
     branches_->Delete(name);
 }
 
-std::optional<Repository::Branch> Repository::GetBranch(const std::string_view name) const {
+std::optional<BranchInfo> Repository::GetBranch(const std::string_view name) const {
     if (auto branch = branches_->Get(name)) {
         return branch.value();
     }
     return std::nullopt;
 }
 
-void Repository::ListBranches(const std::function<void(const Branch& branch)>& cb) const {
+void Repository::ListBranches(const std::function<void(const BranchInfo& branch)>& cb) const {
     if (!cb) {
         return;
     }
-    branches_->Enumerate([&](const std::string_view, const Branch& branch) {
+    branches_->Enumerate([&](const std::string_view, const BranchInfo& branch) {
         cb(branch);
         return true;
     });
@@ -190,7 +191,7 @@ const Datastore Repository::Objects() const {
     return odb_;
 }
 
-bool Repository::CreateRemote(const Remote& remote) {
+bool Repository::CreateRemote(const RemoteInfo& remote) {
     // Check there is no remote with same name.
     if (remotes_->Get(remote.name)) {
         return false;
@@ -205,22 +206,30 @@ bool Repository::CreateRemote(const Remote& remote) {
     }
 }
 
-void Repository::ListRemotes(const std::function<void(const Remote&)>& cb) const {
+void Repository::ListRemotes(const std::function<void(const RemoteInfo&)>& cb) const {
     if (!cb) {
         return;
     }
-    remotes_->Enumerate([&](const std::string_view, const Remote& remote) {
+    remotes_->Enumerate([&](const std::string_view, const RemoteInfo& remote) {
         cb(remote);
         return true;
     });
 }
 
-std::unique_ptr<Database<Repository::Branch>> Repository::GetRemoteBranches(const std::string_view name
-) const {
-    return std::make_unique<Database<Branch>>(layout_.Remotes() / name);
+std::unique_ptr<Database<BranchInfo>> Repository::GetRemoteBranches(const std::string_view name) const {
+    return std::make_unique<Database<BranchInfo>>(layout_.Remotes() / name);
 }
 
-bool Repository::CreateWorkspace(const Workspace& params, bool checkout) {
+std::unique_ptr<Fetcher> Repository::GetRemoteFetcher(const std::string_view name) const {
+    if (const auto remote = remotes_->Get(name)) {
+        if (remote->is_git) {
+            return CreateGitFetcher(remote->name, remote->fetch_uri, this);
+        }
+    }
+    return {};
+}
+
+bool Repository::CreateWorkspace(const WorkspaceInfo& params, bool checkout) {
     // Check there is no workspace with same path.
     if (workspaces_->Get(params.path.string())) {
         return false;
@@ -255,7 +264,7 @@ bool Repository::CreateWorkspace(const Workspace& params, bool checkout) {
     return true;
 }
 
-std::optional<Repository::Workspace> Repository::GetWorkspace(const std::string& name) const {
+std::optional<WorkspaceInfo> Repository::GetWorkspace(const std::string& name) const {
     if (auto ws = workspaces_->Get(name)) {
         const auto state_path = layout_.Workspace(ws->name);
 
