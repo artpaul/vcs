@@ -23,6 +23,29 @@ extern int ExecuteShow(int argc, char* argv[], const std::function<Workspace&()>
 extern int ExecuteStatus(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteSwitch(int argc, char* argv[], const std::function<Workspace&()>& cb);
 
+static void PrintHelp() {
+    fmt::print("usage: vcs [-C <path>] <command> [<options>]\n"
+               "\n"
+               "List of available commands:\n"
+               "   branch       List, create, or delete branches\n"
+               "   commit       Record changes to the repository\n"
+               "   config       Get or set repository or global options\n"
+               "   diff         Show changes between commits, commit and working tree, etc\n"
+               "   fetch        Download objects and refs from another repository\n"
+               "   init         Create an empty repository\n"
+               "   log          Show commit log\n"
+               "   remote       Manage set of tracked repositories\n"
+               "   reset        Reset current HEAD to the specified state\n"
+               "   restore      Restore working tree files\n"
+               "   show         Show various type of objects\n"
+               "   status       Show working tree status\n"
+               "   switch       Switch branches\n"
+               "\n"
+               "Auxiliary tools:\n"
+               "   dump         Dump various internal info\n"
+               "   git          Set of tools to interact with git repositories\n");
+}
+
 static int Main(int argc, char* argv[]) {
     {
         cxxopts::options spec("vcs");
@@ -53,6 +76,7 @@ static int Main(int argc, char* argv[]) {
     }
 
     if (argc < 1) {
+        PrintHelp();
         return 0;
     }
 
