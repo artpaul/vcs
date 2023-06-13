@@ -11,10 +11,6 @@
 #   define FILENO fileno
 #endif
 
-namespace util {
-
-bool is_atty(FILE* f) noexcept {
+bool IsAtty(FILE* f) noexcept {
     return ISATTY(FILENO(f));
 }
-
-} // namespace util

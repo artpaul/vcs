@@ -83,7 +83,7 @@ int DeleteBranches(const Options& options, Workspace& repo) {
 
 int ListRemoteBranches(const Options& options, const Workspace& repo) {
     const auto name_style = [] {
-        if (util::is_atty(stdout)) {
+        if (IsAtty(stdout)) {
             return fmt::fg(fmt::terminal_color::red);
         } else {
             return fmt::text_style();
@@ -155,7 +155,7 @@ int ListRemoteBranches(const Options& options, const Workspace& repo) {
 
 int ListBranches(const Options& options, const Workspace& repo) {
     const auto name_style = [] {
-        if (util::is_atty(stdout)) {
+        if (IsAtty(stdout)) {
             return fmt::fg(fmt::terminal_color::green);
         } else {
             return fmt::text_style();

@@ -23,8 +23,7 @@ void BranchInfo(const Options&, const Workspace& repo) {
     fmt::print(
         "On branch {}\n",
         fmt::styled(
-            branch.name,
-            util::is_atty(stdout) ? fmt::fg(fmt::terminal_color::bright_magenta) : fmt::text_style()
+            branch.name, IsAtty(stdout) ? fmt::fg(fmt::terminal_color::bright_magenta) : fmt::text_style()
         )
     );
 
@@ -69,7 +68,7 @@ void ChangesInfo(const Options& options, const Workspace& repo) {
             };
 
             const auto status_style = [] {
-                if (util::is_atty(stdout)) {
+                if (IsAtty(stdout)) {
                     return fmt::fg(fmt::terminal_color::red);
                 } else {
                     return fmt::text_style();

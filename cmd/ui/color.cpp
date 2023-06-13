@@ -5,7 +5,7 @@
 namespace Vcs {
 
 bool IsColored(const ColorMode mode, FILE* output) {
-    return (mode == ColorMode::Always) || (mode == ColorMode::Auto && util::is_atty(output));
+    return (mode == ColorMode::Always) || (mode == ColorMode::Auto && IsAtty(output));
 }
 
 std::optional<ColorMode> ParseColorMode(const std::string_view value) {

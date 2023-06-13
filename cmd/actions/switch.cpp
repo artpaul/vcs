@@ -89,7 +89,7 @@ int Execute(const Options& options, Workspace& repo) {
             bool has_changes = false;
 
             const auto status_style = [] {
-                if (util::is_atty(stdout)) {
+                if (IsAtty(stdout)) {
                     return fmt::fg(fmt::terminal_color::red);
                 } else {
                     return fmt::text_style();
