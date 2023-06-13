@@ -33,6 +33,8 @@ public:
     static File ForOverwrite(const std::filesystem::path& path);
 
 public:
+    FHANDLE Handle() const;
+
     bool Valid() const;
 
 public:
@@ -43,11 +45,14 @@ public:
     /** Loads data at the current position. */
     [[nodiscard]] size_t Load(void* buf, size_t len);
 
+    /** Loads data at the given offset. */
+    [[nodiscard]] size_t Load(void* buf, size_t len, off_t offset) const;
+
     /** Reads data at the current position. */
     [[nodiscard]] size_t Read(void* buf, size_t len);
 
     /** Reads data at a given offset. */
-    [[nodiscard]] size_t Read(void* buf, size_t len, off_t offset);
+    [[nodiscard]] size_t Read(void* buf, size_t len, off_t offset) const;
 
     size_t Write(const void* buf, size_t len);
 
@@ -61,6 +66,22 @@ private:
 
 private:
     FHANDLE fd_;
+};
+
+class FileMap {
+public:
+    explicit FileMap(File& file);
+
+    ~FileMap();
+
+    [[nodiscard]] void* Map();
+
+    [[nodiscard]] size_t Size() const;
+
+private:
+    File& file_;
+    void* data_;
+    size_t size_;
 };
 
 void StringToFile(const std::filesystem::path& path, const std::string_view value);

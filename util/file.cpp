@@ -8,6 +8,7 @@
 #if defined(_unix_)
 #   include <errno.h>
 #   include <fcntl.h>
+#   include <sys/mman.h>
 #   include <sys/stat.h>
 #   include <sys/types.h>
 #   include <unistd.h>
@@ -66,6 +67,10 @@ File File::ForOverwrite(const std::filesystem::path& path) {
     return File(fd);
 }
 
+FHANDLE File::Handle() const {
+    return fd_;
+}
+
 bool File::Valid() const {
     return fd_ != INVALID_HANDLE_VALUE;
 }
@@ -98,6 +103,22 @@ size_t File::Load(void* const p, size_t len) {
     return buf - reinterpret_cast<std::byte*>(p);
 }
 
+size_t File::Load(void* const p, size_t len, off_t offset) const {
+    std::byte* buf = reinterpret_cast<std::byte*>(p);
+
+    while (len > 0) {
+        if (const size_t read = this->Read(p, len, offset)) {
+            len -= read;
+            buf += read;
+            offset += read;
+        } else {
+            break;
+        }
+    }
+
+    return buf - reinterpret_cast<std::byte*>(p);
+}
+
 size_t File::Read(void* buf, size_t len) {
     if (ssize_t ret = ::read(fd_, buf, len); ret < 0) {
         throw std::system_error(errno, std::system_category(), "cannot read data from file");
@@ -106,7 +127,7 @@ size_t File::Read(void* buf, size_t len) {
     }
 }
 
-size_t File::Read(void* buf, size_t len, off_t offset) {
+size_t File::Read(void* buf, size_t len, off_t offset) const {
     if (ssize_t ret = ::pread(fd_, buf, len, offset); ret < 0) {
         throw std::system_error(errno, std::system_category(), "cannot read data from file");
     } else {
@@ -130,6 +151,37 @@ size_t File::Size() const {
     } else {
         return buf.st_size;
     }
+}
+
+FileMap::FileMap(File& file)
+    : file_(file)
+    , data_(nullptr)
+    , size_(0) {
+}
+
+FileMap::~FileMap() {
+    if (data_) {
+        ::munmap(data_, size_);
+    }
+}
+
+void* FileMap::Map() {
+    if (data_) {
+        return data_;
+    }
+
+    size_ = file_.Size();
+    data_ = ::mmap(nullptr, size_, PROT_READ, MAP_SHARED, file_.Handle(), 0);
+
+    if (data_ == MAP_FAILED) {
+        throw std::system_error(errno, std::system_category(), "cannot mmap file");
+    }
+
+    return data_;
+}
+
+size_t FileMap::Size() const {
+    return size_;
 }
 
 void StringToFile(const std::filesystem::path& path, const std::string_view value) {

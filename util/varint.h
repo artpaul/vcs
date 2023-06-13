@@ -5,7 +5,7 @@
 #include <cstdint>
 
 template <std::integral T>
-size_t EncodeVarint(T value, uint8_t* buf, size_t len) noexcept {
+inline size_t EncodeVarint(T value, uint8_t* buf, size_t len) noexcept {
     size_t size = 0;
 
     while (size != len) {
@@ -22,7 +22,7 @@ size_t EncodeVarint(T value, uint8_t* buf, size_t len) noexcept {
 }
 
 template <std::integral T>
-bool DecodeVarint(const uint8_t* buf, size_t len, T& value) {
+inline bool DecodeVarint(const uint8_t* buf, size_t len, T& value) {
     value = T();
 
     for (size_t i = 0; i != len; ++i) {
