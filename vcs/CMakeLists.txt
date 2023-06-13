@@ -63,6 +63,7 @@ target_sources(libvcs3 PRIVATE
     "store/collect.cpp"
     "store/loose.cpp"
     "store/memory.cpp"
+    "store/pack.cpp"
 )
 
 target_sources(libvcs3 PRIVATE

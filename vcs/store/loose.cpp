@@ -1,4 +1,5 @@
 #include "loose.h"
+#include "disk.h"
 
 #include <util/file.h>
 
@@ -9,75 +10,11 @@
 #include <limits>
 
 namespace Vcs::Store {
-namespace {
 
-/// Size of written objects should not exceed 2'113'929'216 bytes.
-constexpr size_t kMaximumContentSize = LZ4_MAX_INPUT_SIZE;
-
-struct FileHeader {
-    // |----------------------------------------------------------------|
-    // |                  The layout of tag field                       |
-    // |----------------------------------------------------------------|
-    // | : 21 | compression : 3 | checksum : 1 | type : 4 | version : 3 |
-    // |------|-----------------|--------------|----------|-------------|
-
-    /// Packed metainformation about the file and the stored object.
-    uint32_t tag;
-    /// Original size of the object.
-    uint32_t original;
-    /// Size of stored data.
-    /// Should be equal to original size in case of uncompressed data.
-    uint32_t stored;
-    /// Check sum of all previous fields.
-    uint32_t crc;
-
-public:
-    static constexpr uint32_t MakeTag(const Compression compression, const DataType type) noexcept {
-        return
-            // Compression codec.
-            ((uint32_t(compression) & 0x07) << 8)
-            // Has trailing checksum.
-            | (1u << 7)
-            // Type of an object.
-            | ((uint32_t(type) & 0x0F) << 3)
-            // Version of file format.
-            | (1u);
-    }
-
-    /** Type of compression method. */
-    constexpr Compression Codec() const noexcept {
-        return Compression((tag >> 8) & 0x07);
-    }
-
-    /** Size of stored object. */
-    constexpr uint32_t Size() const noexcept {
-        return original;
-    }
-
-    /** Type of stored object. */
-    constexpr DataType Type() const noexcept {
-        return DataType((tag >> 3) & 0x0F);
-    }
-
-    /** Version of a file format. */
-    constexpr uint8_t Version() const noexcept {
-        return tag & 0x07;
-    }
-};
-
-// Ensure FileHeader has expected size.
-static_assert(sizeof(FileHeader) == 16);
-// Ensure the crc field is placed last.
-static_assert(offsetof(FileHeader, crc) + sizeof(FileHeader::crc) == sizeof(FileHeader));
-
-static_assert(std::numeric_limits<decltype(FileHeader::original)>::max() >= kMaximumContentSize);
-
-std::filesystem::path MakePath(const std::filesystem::path& root, const HashId& id) {
+static std::filesystem::path MakePath(const std::filesystem::path& root, const HashId& id) {
     const auto hex = id.ToHex();
     return root / hex.substr(0, 2) / hex;
 }
-
-} // namespace
 
 Loose::Loose(std::filesystem::path path, const Options& options)
     : path_(std::move(path))
@@ -117,13 +54,13 @@ void Loose::Enumerate(bool with_metadata, const std::function<bool(const HashId&
 DataHeader Loose::GetMeta(const HashId& id) const try
 {
     auto file = File::ForRead(MakePath(path_, id));
-    FileHeader hdr{};
+    Disk::FileHeader hdr{};
     // Read file header.
     if (file.Load(&hdr, sizeof(hdr)) != sizeof(hdr)) {
         throw std::runtime_error("cannot read file header");
     }
     // Validate data integrity.
-    if (hdr.crc != XXH32(&hdr, offsetof(FileHeader, crc), 0)) {
+    if (hdr.crc != XXH32(&hdr, offsetof(Disk::FileHeader, crc), 0)) {
         throw std::runtime_error("header data corruption");
     }
     return DataHeader::Make(hdr.Type(), hdr.Size());
@@ -142,13 +79,13 @@ bool Loose::Exists(const HashId& id) const {
 Object Loose::Load(const HashId& id, const DataType expected) const try
 {
     auto file = File::ForRead(MakePath(path_, id));
-    FileHeader hdr{};
+    Disk::FileHeader hdr{};
     // Read file header.
     if (file.Load(&hdr, sizeof(hdr)) != sizeof(hdr)) {
         throw std::runtime_error("cannot read file header");
     }
     // Validate data integrity.
-    if (hdr.crc != XXH32(&hdr, offsetof(FileHeader, crc), 0)) {
+    if (hdr.crc != XXH32(&hdr, offsetof(Disk::FileHeader, crc), 0)) {
         throw std::runtime_error("header data corruption");
     }
     // Type mismatch.
@@ -200,14 +137,14 @@ Object Loose::Load(const HashId& id, const DataType expected) const try
 }
 
 void Loose::Put(const HashId& id, const DataType type, const std::string_view content) {
-    if (content.size() > kMaximumContentSize) {
-        throw std::length_error(fmt::format("object size exceed {} bytes", kMaximumContentSize));
+    if (content.size() > Disk::kMaximumContentSize) {
+        throw std::length_error(fmt::format("object size exceed {} bytes", Disk::kMaximumContentSize));
     }
 
     std::filesystem::create_directories(path_ / id.ToHex().substr(0, 2));
     auto file = File::ForOverwrite(MakePath(path_, id));
-    FileHeader hdr{};
-    hdr.tag = FileHeader::MakeTag(options_.codec, type);
+    Disk::FileHeader hdr{};
+    hdr.tag = Disk::FileHeader::MakeTag(options_.codec, type);
     hdr.original = content.size();
 
     const auto write_to_file = [&](const void* buf, size_t buf_len) {
@@ -215,7 +152,7 @@ void Loose::Put(const HashId& id, const DataType type, const std::string_view co
         // Setup length of stored data.
         hdr.stored = buf_len;
         // Setup header checksum.
-        hdr.crc = XXH32(&hdr, offsetof(FileHeader, crc), 0);
+        hdr.crc = XXH32(&hdr, offsetof(Disk::FileHeader, crc), 0);
         // Write file header.
         file.Write(&hdr, sizeof(hdr));
         // Write file content.
