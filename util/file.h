@@ -13,8 +13,8 @@
 class File {
 public:
     File();
-    explicit File(FHANDLE fd);
-    File(File&& other);
+    explicit File(FHANDLE fd) noexcept;
+    File(File&& other) noexcept;
     ~File();
 
     /**
@@ -58,6 +58,9 @@ public:
 
     /** Current size of the file. */
     [[nodiscard]] size_t Size() const;
+
+public:
+    File& operator=(File&&) noexcept;
 
 private:
     File(const File&) = delete;

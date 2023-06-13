@@ -24,11 +24,11 @@ File::File()
     : fd_(INVALID_HANDLE_VALUE) {
 }
 
-File::File(FHANDLE fd)
+File::File(FHANDLE fd) noexcept
     : fd_(fd) {
 }
 
-File::File(File&& other)
+File::File(File&& other) noexcept
     : fd_(other.fd_) {
     other.fd_ = INVALID_HANDLE_VALUE;
 }
@@ -151,6 +151,11 @@ size_t File::Size() const {
     } else {
         return buf.st_size;
     }
+}
+
+File& File::operator=(File&& other) noexcept {
+    std::swap(fd_, other.fd_);
+    return *this;
 }
 
 FileMap::FileMap(File& file)
