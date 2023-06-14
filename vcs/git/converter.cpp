@@ -31,12 +31,8 @@ public:
         , repo_(repo) {
     }
 
-    Builder& UseBlobCache(bool value) {
-        if (value) {
-            blob_cache_ = std::make_unique<std::unordered_map<HashId, std::pair<HashId, uint32_t>>>();
-        } else {
-            blob_cache_.reset();
-        }
+    Builder& SetBlobCache(std::shared_ptr<std::unordered_map<HashId, PathEntry>> value) {
+        blob_cache_ = std::move(value);
         return *this;
     }
 
@@ -105,11 +101,13 @@ private:
         PathEntry entry;
         // Setup type.
         entry.type = PathTypeFromMode(file.mode);
-        // Try to setup id and size from cache.
+        // Try to setup id, data and size from cache.
         if (blob_cache_) {
-            if (auto bi = blob_cache_->find(HashId::FromBytes(file.id.id)); bi != blob_cache_->end()) {
-                entry.id = bi->second.first;
-                entry.size = bi->second.second;
+            if (const auto bi = blob_cache_->find(HashId::FromBytes(file.id.id)); bi != blob_cache_->end())
+            {
+                entry.id = bi->second.id;
+                entry.data = bi->second.data;
+                entry.size = bi->second.size;
                 return entry;
             }
         }
@@ -134,7 +132,7 @@ private:
         );
 
         if (blob_cache_) {
-            blob_cache_->emplace(HashId::FromBytes(file.id.id), std::make_pair(entry.id, entry.size));
+            blob_cache_->emplace(HashId::FromBytes(file.id.id), entry);
         }
 
         return entry;
@@ -160,7 +158,7 @@ private:
     Datastore& odb_;
     StageArea& stage_;
     git_repository* const repo_;
-    std::unique_ptr<std::unordered_map<HashId, std::pair<HashId, uint32_t>>> blob_cache_;
+    std::shared_ptr<std::unordered_map<HashId, PathEntry>> blob_cache_;
 };
 
 } // namespace
@@ -189,6 +187,7 @@ private:
     Options options_;
     git_repository* repo_{nullptr};
     std::function<HashId(const HashId&)> remap_;
+    std::shared_ptr<std::unordered_map<HashId, PathEntry>> blob_cache_;
     std::shared_ptr<Store::MemoryCache> tree_cache_;
 };
 
@@ -197,6 +196,10 @@ Converter::Impl::Impl(const std::filesystem::path& path, const Options& options)
     ::git_libgit2_init();
 
     CheckError(::git_repository_open_bare(&repo_, path.c_str()), "opening repository");
+
+    if (options.use_blob_chache) {
+        blob_cache_ = std::make_shared<std::unordered_map<HashId, PathEntry>>();
+    }
 
     tree_cache_ = Store::MemoryCache::Make(32u << 20);
 }
@@ -314,7 +317,12 @@ HashId Converter::Impl::ConvertCommit(const HashId& id, Datastore odb) {
             stage = std::make_unique<StageArea>(stage_odb);
         }
 
-        Builder(odb, *stage, repo_).UseBlobCache(options_.use_blob_chache).Apply(diff.get());
+        Builder(odb, *stage, repo_).SetBlobCache(blob_cache_).Apply(diff.get());
+
+        // Trim the blob cache to prevent unlimited growing in size.
+        if (blob_cache_ && blob_cache_->size() > (512u << 10)) {
+            blob_cache_->clear();
+        }
     }
 
     if (options_.store_original_hash) {
