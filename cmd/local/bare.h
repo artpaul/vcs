@@ -80,6 +80,9 @@ struct WorkspaceInfo {
 class Repository {
 public:
     struct Options {
+        /// If true, all writes of objects will be forwarded directly into a pack storage.
+        bool bulk_upload = false;
+
         /// If true, the repository will be opened in read-only mode.
         bool read_only = false;
     };
@@ -194,6 +197,9 @@ public:
     /**@}*/
 
 protected:
+    Datastore OpenObjects(const Options& options);
+
+protected:
     std::filesystem::path bare_path_;
     ///
     Layout layout_;
@@ -207,6 +213,9 @@ protected:
     std::unique_ptr<Database<RemoteInfo>> remotes_;
     /// Local workspaces.
     std::unique_ptr<Database<WorkspaceInfo>> workspaces_;
+
+    /// Finalization routines.
+    std::vector<std::function<void()>> finalizers_;
 };
 
 } // namespace Vcs

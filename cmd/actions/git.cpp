@@ -14,7 +14,7 @@ static const std::string kDefaultRemote("origin");
 namespace Vcs {
 namespace {
 
-int ExecuteConvert(int argc, char* argv[], const std::function<Workspace&()>&) {
+int ExecuteConvert(int argc, char* argv[], const std::function<Workspace&(const Repository::Options&)>&) {
     struct {
         std::string branch;
         std::filesystem::path path;
@@ -72,7 +72,7 @@ int ExecuteConvert(int argc, char* argv[], const std::function<Workspace&()>&) {
         Repository::Initialize(bare_path);
     }
 
-    Repository repo(bare_path, Repository::Options());
+    Repository repo(bare_path, Repository::Options{.bulk_upload = true});
     std::optional<std::string> branch_name;
 
     // Create remote.
@@ -168,7 +168,7 @@ int ExecuteConvert(int argc, char* argv[], const std::function<Workspace&()>&) {
     return 0;
 }
 
-int ExecuteOid(int argc, char* argv[], const std::function<Workspace&()>& cb) {
+int ExecuteOid(int argc, char* argv[], const std::function<Workspace&(const Repository::Options&)>& cb) {
     struct {
         HashId oid;
     } options;
@@ -199,7 +199,8 @@ int ExecuteOid(int argc, char* argv[], const std::function<Workspace&()>& cb) {
         }
     }
 
-    Database<Git::Remap> db(cb().GetLayout().Database("git"), Lmdb::Options());
+    const auto& repo = cb(Repository::Options{.read_only = true});
+    Database<Git::Remap> db(repo.GetLayout().Database("git"), Lmdb::Options());
 
     if (const auto rec = db.Get(options.oid.ToBytes())) {
         fmt::print("{}\n", rec.value().vcs);
@@ -220,9 +221,11 @@ void PrintHelp() {
 
 } // namespace
 
-int ExecuteGit(int argc, char* argv[], const std::function<Workspace&()>& cb) {
+int ExecuteGit(int argc, char* argv[], const std::function<Workspace&(const Repository::Options&)>& cb) {
     const std::unordered_map<
-        std::string_view, std::function<int(int argc, char* argv[], const std::function<Workspace&()>& cb)>>
+        std::string_view,
+        std::function<
+            int(int argc, char* argv[], const std::function<Workspace&(const Repository::Options&)>& cb)>>
         actions = {
             {"convert", ExecuteConvert},
             {"oid", ExecuteOid},

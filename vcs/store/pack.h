@@ -19,7 +19,7 @@ namespace Vcs::Store {
 class Leveled : public Datastore::Backend {
 public:
     struct Options {
-        size_t memtable_size = 8u << 20;
+        size_t memtable_size = 64u << 20;
 
         /// Number of snapshots to trigger a packing.
         size_t snapshots_to_pack = 4;

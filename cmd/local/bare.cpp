@@ -5,6 +5,7 @@
 
 #include <vcs/changes/revwalk.h>
 #include <vcs/store/loose.h>
+#include <vcs/store/pack.h>
 
 #include <util/file.h>
 
@@ -80,15 +81,18 @@ Repository::Repository(const std::filesystem::path& path, const Options& options
     , layout_(path) {
     const auto lmdb_options = Lmdb::Options{.read_only = options.read_only};
 
+    // Bulk upload cannot be done in read-only mode.
+    assert(!options.bulk_upload || !options.read_only);
+
     // Open configs.
     config_ = std::make_unique<Config>();
     // Setup default configuration.
     config_->Reset(ConfigLocation::Default, Config::MakeBackend(GetDefaultConfig()));
     // Setup repository-level configuration.
-    config_->Reset(ConfigLocation::Repository, Config::MakeBackend(path / "config" / "config.json"));
+    config_->Reset(ConfigLocation::Repository, Config::MakeBackend(layout_.Configs() / "config.json"));
 
     // Open object database.
-    odb_ = Datastore::Make<Store::Loose>(path / "objects");
+    odb_ = OpenObjects(options);
 
     // Open branch database.
     branches_ = std::make_unique<Database<BranchInfo>>(layout_.Database("branches"), lmdb_options);
@@ -100,24 +104,36 @@ Repository::Repository(const std::filesystem::path& path, const Options& options
     workspaces_ = std::make_unique<Database<WorkspaceInfo>>(layout_.Database("workspaces"), lmdb_options);
 }
 
-Repository::~Repository() = default;
+Repository::~Repository() {
+    for (const auto& f : finalizers_) {
+        f();
+    }
+}
 
 void Repository::Initialize(const std::filesystem::path& path) {
+    const Layout layout(path);
+
+    // Root directory.
     std::filesystem::create_directories(path);
 
-    std::filesystem::create_directory(path / "config");
-    std::filesystem::create_directory(path / "db");
-    std::filesystem::create_directory(path / "db" / "branches");
-    std::filesystem::create_directory(path / "db" / "remotes");
-    std::filesystem::create_directory(path / "db" / "workspaces");
-    std::filesystem::create_directory(path / "remotes");
-    std::filesystem::create_directory(path / "objects");
-    std::filesystem::create_directory(path / "workspaces");
+    // Top-level directories.
+    std::filesystem::create_directory(layout.Configs());
+    std::filesystem::create_directory(layout.Databases());
+    std::filesystem::create_directory(layout.Remotes());
+    std::filesystem::create_directory(layout.Workspaces());
+
+    // Databases.
+    std::filesystem::create_directory(layout.Database("branches"));
+    std::filesystem::create_directory(layout.Database("remotes"));
+    std::filesystem::create_directory(layout.Database("workspaces"));
+
+    // Storages.
+    std::filesystem::create_directories(layout.Objects());
 
     // Initialize branch database.
-    std::make_unique<Database<BranchInfo>>(path / "db" / "branches").reset(nullptr);
+    std::make_unique<Database<BranchInfo>>(layout.Database("branches")).reset(nullptr);
     // Initialize workspace database.
-    std::make_unique<Database<WorkspaceInfo>>(path / "db" / "workspaces").reset(nullptr);
+    std::make_unique<Database<WorkspaceInfo>>(layout.Database("workspaces")).reset(nullptr);
 }
 
 Layout Repository::GetLayout() const {
@@ -280,6 +296,26 @@ std::optional<WorkspaceInfo> Repository::GetWorkspace(const std::string& name) c
     }
 
     return std::nullopt;
+}
+
+Datastore Repository::OpenObjects(const Options& options) {
+    if (options.bulk_upload) {
+        auto pack = Store::Leveled::Make(layout_.Packs(), Store::Leveled::Options{.read_only = false});
+
+        // Pack all written objects at the end.
+        finalizers_.emplace_back([pack] { pack->Pack(); });
+
+        return Datastore().Chain(pack);
+    }
+
+    // Loose storage.
+    Datastore odb = Datastore::Make<Store::Loose>(layout_.Objects());
+    // Pack storage.
+    if (std::filesystem::exists(layout_.Packs())) {
+        odb = odb.Chain(Store::Leveled::Make(layout_.Packs(), Store::Leveled::Options{.read_only = true}));
+    }
+
+    return odb;
 }
 
 } // namespace Vcs

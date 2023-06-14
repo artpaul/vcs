@@ -13,7 +13,7 @@ extern int ExecuteConfig(int argc, char* argv[], const std::function<Workspace&(
 extern int ExecuteDiff(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteDump(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteFetch(int argc, char* argv[], const std::function<Workspace&()>& cb);
-extern int ExecuteGit(int argc, char* argv[], const std::function<Workspace&()>& cb);
+extern int ExecuteGit(int argc, char* argv[], const std::function<Workspace&(const Repository::Options&)>& cb);
 extern int ExecuteInit(int argc, char* argv[]);
 extern int ExecuteLog(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteRemote(int argc, char* argv[], const std::function<Workspace&()>& cb);
@@ -138,12 +138,16 @@ int Main(int argc, char* argv[]) {
     const auto get_workspace_read_only = [&] -> Workspace& {
         return instance.GetWorkspace(Repository::Options{.read_only = true});
     };
+    // Open with specific options.
+    const auto get_workspace_with_options = [&](const Repository::Options& options) -> Workspace& {
+        return instance.GetWorkspace(options);
+    };
 
     switch (ParseAction(argv[0])) {
         case Action::Dump:
             return ExecuteDump(argc, argv, get_workspace_read_only);
         case Action::Git:
-            return ExecuteGit(argc, argv, get_workspace);
+            return ExecuteGit(argc, argv, get_workspace_with_options);
 
         case Action::Branch:
             return ExecuteBranch(argc, argv, get_workspace);
