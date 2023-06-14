@@ -16,11 +16,6 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "")
     set(CMAKE_BUILD_TYPE "Debug")
 endif()
 
-if("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
-    message(STATUS "Enabling LTO...")
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
-endif()
-
 # Grpc flags.
 set(protobuf_INSTALL OFF)
 set(protobuf_BUILD_TESTS OFF)

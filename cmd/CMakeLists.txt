@@ -1,6 +1,11 @@
 add_executable(vcs)
 add_library(vcs-local)
 
+if("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
+    message(STATUS "Enabling LTO...")
+    set_property(TARGET vcs PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif()
+
 target_link_libraries(vcs-local
     contrib-lmdb
     libvcs3
