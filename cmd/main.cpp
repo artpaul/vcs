@@ -23,7 +23,56 @@ extern int ExecuteShow(int argc, char* argv[], const std::function<Workspace&()>
 extern int ExecuteStatus(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteSwitch(int argc, char* argv[], const std::function<Workspace&()>& cb);
 
-static void PrintHelp() {
+namespace {
+
+class Instance {
+public:
+    Workspace& GetWorkspace(const Repository::Options& options) {
+        if (workspace_) {
+            return *workspace_;
+        }
+
+        auto bare_path = std::filesystem::path();
+        auto path = std::filesystem::current_path();
+        auto vcs_path = std::filesystem::path();
+
+        while (true) {
+            vcs_path = path / ".vcs";
+
+            switch (std::filesystem::status(vcs_path).type()) {
+                case std::filesystem::file_type::directory: {
+                    if (std::filesystem::exists(vcs_path / "workspaces")) {
+                        bare_path = vcs_path;
+                    }
+                    break;
+                }
+                default:
+                    break;
+            }
+
+            if (!bare_path.empty()) {
+                break;
+            }
+
+            if (path.has_relative_path()) {
+                path = path.parent_path();
+            } else {
+                throw std::runtime_error(
+                    fmt::format("error: no repository in the current directory or in any parent directory")
+                );
+            }
+        }
+
+        workspace_ = std::make_unique<Workspace>(bare_path, path, options);
+
+        return *workspace_;
+    }
+
+private:
+    std::unique_ptr<Workspace> workspace_;
+};
+
+void PrintHelp() {
     fmt::print("usage: vcs [-C <path>] <command> [<options>]\n"
                "\n"
                "List of available commands:\n"
@@ -46,7 +95,7 @@ static void PrintHelp() {
                "   git          Set of tools to interact with git repositories\n");
 }
 
-static int Main(int argc, char* argv[]) {
+int Main(int argc, char* argv[]) {
     {
         cxxopts::options spec("vcs");
         spec.add_options(
@@ -80,53 +129,19 @@ static int Main(int argc, char* argv[]) {
         return 0;
     }
 
-    std::unique_ptr<Workspace> workspace;
-
-    auto get_workspace = [&] -> Workspace& {
-        if (workspace) {
-            return *workspace;
-        }
-
-        auto bare_path = std::filesystem::path();
-        auto path = std::filesystem::current_path();
-        auto vcs_path = std::filesystem::path();
-
-        while (true) {
-            vcs_path = path / ".vcs";
-
-            switch (std::filesystem::status(vcs_path).type()) {
-                case std::filesystem::file_type::directory: {
-                    if (std::filesystem::exists(vcs_path / "workspaces")) {
-                        bare_path = vcs_path;
-                    }
-                    break;
-                }
-                default:
-                    break;
-            }
-
-            if (!bare_path.empty()) {
-                break;
-            }
-
-            if (path.has_relative_path()) {
-                path = path.parent_path();
-            } else {
-                fmt::print(
-                    stderr, "error: no repository in the current directory or in any parent directory\n"
-                );
-                std::exit(EXIT_FAILURE);
-            }
-        }
-
-        workspace = std::make_unique<Workspace>(bare_path, path);
-
-        return *workspace;
+    Instance instance;
+    // Default instance.
+    const auto get_workspace = [&] -> Workspace& {
+        return instance.GetWorkspace(Repository::Options());
+    };
+    // Open in read-only mode.
+    const auto get_workspace_read_only = [&] -> Workspace& {
+        return instance.GetWorkspace(Repository::Options{.read_only = true});
     };
 
     switch (ParseAction(argv[0])) {
         case Action::Dump:
-            return ExecuteDump(argc, argv, get_workspace);
+            return ExecuteDump(argc, argv, get_workspace_read_only);
         case Action::Git:
             return ExecuteGit(argc, argv, get_workspace);
 
@@ -139,13 +154,13 @@ static int Main(int argc, char* argv[]) {
         case Action::Config:
             return ExecuteConfig(argc, argv, get_workspace);
         case Action::Diff:
-            return ExecuteDiff(argc, argv, get_workspace);
+            return ExecuteDiff(argc, argv, get_workspace_read_only);
         case Action::Fetch:
             return ExecuteFetch(argc, argv, get_workspace);
         case Action::Init:
             return ExecuteInit(argc, argv);
         case Action::Log:
-            return ExecuteLog(argc, argv, get_workspace);
+            return ExecuteLog(argc, argv, get_workspace_read_only);
         case Action::Remote:
             return ExecuteRemote(argc, argv, get_workspace);
         case Action::Remove:
@@ -155,9 +170,9 @@ static int Main(int argc, char* argv[]) {
         case Action::Restore:
             return ExecuteRestore(argc, argv, get_workspace);
         case Action::Show:
-            return ExecuteShow(argc, argv, get_workspace);
+            return ExecuteShow(argc, argv, get_workspace_read_only);
         case Action::Status:
-            return ExecuteStatus(argc, argv, get_workspace);
+            return ExecuteStatus(argc, argv, get_workspace_read_only);
         case Action::Switch:
             return ExecuteSwitch(argc, argv, get_workspace);
         case Action::Workspace:
@@ -170,6 +185,7 @@ static int Main(int argc, char* argv[]) {
     return 0;
 }
 
+} // namespace
 } // namespace Vcs
 
 int main(int argc, char* argv[]) {

@@ -19,7 +19,7 @@ int InitializeBare(const Options& options) {
     // Just create a bare repository.
     Repository::Initialize(options.path);
 
-    Repository repo(options.path);
+    Repository repo(options.path, Repository::Options());
     // Create starting point of the history.
     repo.CreateBranch(options.branch, HashId());
 
@@ -36,7 +36,7 @@ int InitializeWorkspace(const Options& options) {
     // Create bare repository.
     Repository::Initialize(bare_path);
 
-    Repository repo(bare_path);
+    Repository repo(bare_path, Repository::Options());
     // Create starting point of the history.
     repo.CreateBranch(options.branch, HashId());
 

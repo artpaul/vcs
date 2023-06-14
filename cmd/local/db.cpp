@@ -75,9 +75,11 @@ Database::Impl::Impl(const std::filesystem::path& path, const Options& options)
         }
     };
 
+    const unsigned int falgs = MDB_NOTLS | (options.read_only ? MDB_RDONLY : 0);
+
     check(::mdb_env_create(&env_));
     check(::mdb_env_set_mapsize(env_, options.database_capacity));
-    check(::mdb_env_open(env_, path.c_str(), MDB_NOTLS, 0664));
+    check(::mdb_env_open(env_, path.c_str(), falgs, 0664));
 }
 
 Database::Impl::~Impl() noexcept {

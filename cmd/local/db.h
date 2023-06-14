@@ -13,6 +13,9 @@ struct Options {
 
     /// If true, the database will be created if it is missing.
     bool create_if_missing = false;
+
+    /// If true, the database will be opened in read-only mode.
+    bool read_only = false;
 };
 
 class Status {

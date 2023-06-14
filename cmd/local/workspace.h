@@ -24,7 +24,11 @@ enum class ResetMode {
  */
 class Workspace : public Repository {
 public:
-    Workspace(const std::filesystem::path& bare_path, const std::filesystem::path& work_path);
+    Workspace(
+        const std::filesystem::path& bare_path,
+        const std::filesystem::path& work_path,
+        const Options& options
+    );
 
     ~Workspace();
 

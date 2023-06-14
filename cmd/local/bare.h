@@ -79,7 +79,13 @@ struct WorkspaceInfo {
 
 class Repository {
 public:
-    Repository(const std::filesystem::path& path);
+    struct Options {
+        /// If true, the repository will be opened in read-only mode.
+        bool read_only = false;
+    };
+
+public:
+    Repository(const std::filesystem::path& path, const Options& options);
 
     ~Repository();
 

@@ -95,8 +95,10 @@ private:
     const Workspace* workspace_;
 };
 
-Workspace::Workspace(const std::filesystem::path& bare_path, const std::filesystem::path& work_path)
-    : Repository(bare_path) {
+Workspace::Workspace(
+    const std::filesystem::path& bare_path, const std::filesystem::path& work_path, const Options& options
+)
+    : Repository(bare_path, options) {
     // Lookup workspace settings.
     if (const auto& ws = workspaces_->Get(work_path.string())) {
         state_path_ = bare_path_ / "workspaces" / ws->name;

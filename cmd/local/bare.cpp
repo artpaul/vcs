@@ -75,9 +75,11 @@ auto WorkspaceInfo::Save(const WorkspaceInfo& rec) -> std::string {
     return json.dump();
 }
 
-Repository::Repository(const std::filesystem::path& path)
+Repository::Repository(const std::filesystem::path& path, const Options& options)
     : bare_path_(path)
     , layout_(path) {
+    const auto lmdb_options = Lmdb::Options{.read_only = options.read_only};
+
     // Open configs.
     config_ = std::make_unique<Config>();
     // Setup default configuration.
@@ -89,13 +91,13 @@ Repository::Repository(const std::filesystem::path& path)
     odb_ = Datastore::Make<Store::Loose>(path / "objects");
 
     // Open branch database.
-    branches_ = std::make_unique<Database<BranchInfo>>(layout_.Database("branches"));
+    branches_ = std::make_unique<Database<BranchInfo>>(layout_.Database("branches"), lmdb_options);
 
     // Open remotes database.
-    remotes_ = std::make_unique<Database<RemoteInfo>>(layout_.Database("remotes"));
+    remotes_ = std::make_unique<Database<RemoteInfo>>(layout_.Database("remotes"), lmdb_options);
 
     // Open workspace database.
-    workspaces_ = std::make_unique<Database<WorkspaceInfo>>(layout_.Database("workspaces"));
+    workspaces_ = std::make_unique<Database<WorkspaceInfo>>(layout_.Database("workspaces"), lmdb_options);
 }
 
 Repository::~Repository() = default;

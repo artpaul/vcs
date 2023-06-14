@@ -72,7 +72,7 @@ int ExecuteConvert(int argc, char* argv[], const std::function<Workspace&()>&) {
         Repository::Initialize(bare_path);
     }
 
-    Repository repo(bare_path);
+    Repository repo(bare_path, Repository::Options());
     std::optional<std::string> branch_name;
 
     // Create remote.
