@@ -1,7 +1,7 @@
-#include <cmd/local/revparse.h>
 #include <ut/lib/graph.h>
 #include <vcs/changes/revwalk.h>
 #include <vcs/changes/stage.h>
+#include <vcs/common/revparse.h>
 #include <vcs/store/memory.h>
 
 #include <contrib/gtest/gtest.h>

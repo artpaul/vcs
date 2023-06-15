@@ -1,10 +1,10 @@
 #include "workspace.h"
-#include "config.h"
-#include "revparse.h"
 #include "worktree.h"
 
 #include <vcs/changes/revwalk.h>
 #include <vcs/changes/stage.h>
+#include <vcs/common/config.h>
+#include <vcs/common/revparse.h>
 #include <vcs/object/commit.h>
 #include <vcs/object/serialize.h>
 #include <vcs/store/memory.h>

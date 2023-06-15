@@ -13,10 +13,8 @@ target_link_libraries(vcs-local
 
 target_sources(vcs-local PRIVATE
     "local/bare.cpp"
-    "local/config.cpp"
     "local/db.cpp"
     "local/fetch.cpp"
-    "local/revparse.cpp"
     "local/workspace.cpp"
     "local/worktree.cpp"
     "ui/color.cpp"

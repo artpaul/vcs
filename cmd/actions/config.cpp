@@ -1,5 +1,5 @@
-#include <cmd/local/config.h>
 #include <cmd/local/workspace.h>
+#include <vcs/common/config.h>
 
 #include <contrib/cxxopts/cxxopts.hpp>
 #include <contrib/fmt/fmt/format.h>

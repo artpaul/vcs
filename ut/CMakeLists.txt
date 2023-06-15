@@ -3,7 +3,6 @@ add_executable(libvcs3-ut)
 target_link_libraries(libvcs3-ut
     contrib-gtest
     libvcs3
-    vcs-local
 )
 
 target_sources(libvcs3-ut PRIVATE

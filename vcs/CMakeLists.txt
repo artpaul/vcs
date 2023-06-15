@@ -53,6 +53,8 @@ target_sources(libvcs3 PRIVATE
     "changes/revwalk.cpp"
     "changes/stage.cpp"
     "changes/validate.cpp"
+    "common/config.cpp"
+    "common/revparse.cpp"
     "git/converter.cpp"
     "object/change.cpp"
     "object/commit.cpp"

@@ -1,6 +1,6 @@
-#include <cmd/local/config.h>
 #include <cmd/local/workspace.h>
 #include <vcs/changes/path.h>
+#include <vcs/common/config.h>
 #include <vcs/object/commit.h>
 
 #include <contrib/cxxopts/cxxopts.hpp>

@@ -1,9 +1,9 @@
 #include "bare.h"
-#include "config.h"
 #include "fetch.h"
 #include "worktree.h"
 
 #include <vcs/changes/revwalk.h>
+#include <vcs/common/config.h>
 #include <vcs/store/loose.h>
 #include <vcs/store/memory.h>
 #include <vcs/store/pack.h>

@@ -1,4 +1,4 @@
-#include <cmd/local/config.h>
+#include <vcs/common/config.h>
 
 #include <contrib/fmt/fmt/format.h>
 #include <contrib/gtest/gtest.h>
