@@ -4,8 +4,6 @@ option(BUILD_TESTS "Build tests" ON)
 
 project(vcs C CXX)
 
-include_directories(.)
-
 find_package(Threads REQUIRED)
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -16,10 +14,12 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "")
     set(CMAKE_BUILD_TYPE "Debug")
 endif()
 
+# Common flags.
+set(BUILD_SHARED_LIBS OFF)
+
 # Grpc flags.
 set(protobuf_INSTALL OFF)
 set(protobuf_BUILD_TESTS OFF)
-set(BUILD_SHARED_LIBS OFF)
 set(gRPC_BUILD_CSHARP_EXT OFF)
 set(gRPC_BUILD_GRPC_CSHARP_PLUGIN OFF)
 set(gRPC_BUILD_GRPC_NODE_PLUGIN OFF)
@@ -46,12 +46,14 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wnon-virtual-dtor -Werror
 
 # Disable annoying gcc warnings.
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-missing-field-initializers -Wno-implicit-fallthrough")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-missing-field-initializers -Wno-implicit-fallthrough -Wno-sign-compare")
 
     if("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-maybe-uninitialized")
     endif()
 endif()
+
+include_directories(.)
 
 add_subdirectory(cmd)
 add_subdirectory(vcs)

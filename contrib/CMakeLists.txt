@@ -4,11 +4,13 @@ add_subdirectory(flatbuffers)
 add_subdirectory(fmt)
 add_subdirectory(grpc)
 add_subdirectory(json)
+add_subdirectory(leveldb)
 add_subdirectory(libfuse)
 add_subdirectory(libgit2)
 add_subdirectory(liblmdb)
 add_subdirectory(lz4)
 add_subdirectory(sha)
+add_subdirectory(snappy)
 add_subdirectory(xxhash)
 
 # Tests.
