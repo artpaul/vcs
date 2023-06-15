@@ -430,6 +430,18 @@ PathType Tree::Entry::Type() const {
     return PathType(static_cast<const Fbs::TreeEntry*>(p_)->type());
 }
 
+Tree::Entry::operator PathEntry() const {
+    const auto te = static_cast<const Fbs::TreeEntry*>(p_);
+    const auto id = static_cast<const Fbs::TreeEntry*>(p_)->id();
+
+    return PathEntry{
+        .id = bool(id) ? HashId::FromBytes(id->data(), id->size()) : HashId(),
+        .data = DataType(te->data()),
+        .type = PathType(te->type()),
+        .size = te->size(),
+    };
+}
+
 Tree::Entry Tree::RangeEntries::Item(const void* p, size_t i) {
     return Entry(static_cast<const flatbuffers::Vector<flatbuffers::Offset<Fbs::TreeEntry>>*>(p)
                      ->GetAs<Fbs::TreeEntry>(i));

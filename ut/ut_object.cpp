@@ -1,6 +1,7 @@
 #include <vcs/api/fbs/commit.fb.h>
 #include <vcs/api/fbs/index.fb.h>
 #include <vcs/api/fbs/tree.fb.h>
+#include <vcs/object/change.h>
 #include <vcs/object/object.h>
 #include <vcs/object/serialize.h>
 
@@ -149,6 +150,9 @@ TEST(ObjectTree, Find) {
     // Test find.
     EXPECT_EQ(tree.Find("main.cpp")->Name(), "main.cpp");
     EXPECT_EQ(tree.Find("test.txt")->Name(), "test.txt");
+
+    EXPECT_FALSE(CompareEntries(static_cast<PathEntry>(*tree.Find("test.txt")), MakeBlobEntry("text file"))
+    );
 }
 
 TEST(ObjectTree, Serialize) {

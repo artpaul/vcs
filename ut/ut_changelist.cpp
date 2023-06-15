@@ -36,6 +36,22 @@ static HashId MakeTreeUtil(Datastore odb) {
     return index.SaveTree(odb);
 }
 
+TEST(Change, CompareEntries) {
+    EXPECT_FALSE(CompareEntries(PathEntry{}, PathEntry{}));
+    EXPECT_FALSE(CompareEntries(PathEntry{.size = 1}, PathEntry{.size = 1}));
+    EXPECT_FALSE(CompareEntries(PathEntry{.type = PathType::File}, PathEntry{.type = PathType::File}));
+
+    EXPECT_TRUE(CompareEntries(PathEntry{.size = 1}, PathEntry{.size = 2}));
+    EXPECT_TRUE(CompareEntries(PathEntry{.type = PathType::File}, PathEntry{.type = PathType::Directory}));
+
+    EXPECT_TRUE(CompareEntries(PathEntry{.type = PathType::File}, PathEntry{.type = PathType::Executible})
+                    .attributes);
+    EXPECT_TRUE(CompareEntries(PathEntry{.size = 1}, PathEntry{.size = 2}).content);
+    EXPECT_TRUE(
+        CompareEntries(PathEntry{.type = PathType::File}, PathEntry{.type = PathType::Directory}).type
+    );
+}
+
 TEST(ChangelistBuilder, Changes) {
     auto mem = Datastore::Make<Store::MemoryCache>();
 

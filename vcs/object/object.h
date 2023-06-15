@@ -461,6 +461,7 @@ public:
     public:
         explicit constexpr Entry(const void* p) noexcept
             : p_(p) {
+            assert(p_);
         }
 
         /// Identifier of an object.
@@ -477,6 +478,9 @@ public:
 
         /// Entry's type.
         PathType Type() const;
+
+        /// Constructs PathEntry.
+        explicit operator PathEntry() const;
 
     private:
         const void* const p_;

@@ -16,6 +16,8 @@ namespace {
 
 struct Options {
     HashId head{};
+    /// Limit output by specific path.
+    std::string path;
     /// Maximum number of commits to output.
     uint64_t count = std::numeric_limits<uint64_t>::max();
     /// Coloring mode.
@@ -65,7 +67,7 @@ int Execute(const Options& options, const Workspace& repo) {
         }
     };
 
-    repo.Log(LogOptions().Push(options.head), [&](const HashId& id, const Commit& c) {
+    const auto cb = [&](const HashId& id, const Commit& c) {
         ++count;
 
         if (options.oneline) {
@@ -79,7 +81,16 @@ int Execute(const Options& options, const Workspace& repo) {
         }
 
         return options.count > count;
-    });
+    };
+
+    if (options.path.empty()) {
+        repo.Log(LogOptions().Push(options.head), cb);
+    } else {
+        repo.PathLog(
+            LogOptions().Push(options.head), options.path,
+            [&](const HashId& id, const std::string_view, const Commit& c) { return cb(id, c); }
+        );
+    }
 
     return 0;
 }
@@ -114,12 +125,18 @@ int ExecuteLog(int argc, char* argv[], const std::function<Workspace&()>& cb) {
         if (opts.has("args")) {
             const auto& args = opts["args"].as<std::vector<std::string>>();
             const auto& repo = cb();
-
-            if (const auto id = repo.ResolveReference(args[0])) {
+            size_t i = 0;
+            // Try to parse the first argument as a reference.
+            if (const auto id = repo.ResolveReference(args[i])) {
+                ++i;
                 options.head = *id;
-            } else if (repo.HasPath(repo.GetCurrentHead(), args[0])) {
-                ;
-            } else {
+            }
+            // Try to parse the current argument as a path.
+            if (i < args.size() && repo.HasPath(repo.GetCurrentHead(), args[i])) {
+                options.path = args[i];
+            }
+
+            if (!bool(options.head) && options.path.empty()) {
                 fmt::print(
                     stderr,
                     "error: ambiguous argument '{}': unknown revision or path not in the working tree.\n",

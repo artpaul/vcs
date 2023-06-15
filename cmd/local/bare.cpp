@@ -5,6 +5,7 @@
 
 #include <vcs/changes/revwalk.h>
 #include <vcs/store/loose.h>
+#include <vcs/store/memory.h>
 #include <vcs/store/pack.h>
 
 #include <util/file.h>
@@ -199,6 +200,59 @@ void Repository::Log(
                 return WalkAction::Stop;
             }
         });
+}
+
+void Repository::PathLog(
+    const LogOptions& options,
+    const std::string_view path,
+    const std::function<bool(const HashId& id, const std::string_view, const Commit&)>& cb
+) const {
+    if (!cb || options.roots.empty()) {
+        return;
+    }
+
+    if (path.empty()) {
+        return Log(options, [&](const HashId& id, const Commit& commit) {
+            return cb(id, std::string_view(), commit);
+        });
+    }
+
+    //
+    auto odb = odb_.Cache(Store::MemoryCache::Make());
+    //
+    std::optional<std::pair<HashId, PathEntry>> prev;
+
+    RevisionGraph::Walker(RevisionGraph(odb_))
+        .Hide(options.hidden)
+        .Push(options.roots)
+        .SimplifyFirstParent(true)
+        .Walk([&](const RevisionGraph::Revision& r) {
+            const auto entry = StageArea(odb, r.Tree()).GetEntry(path);
+
+            if (!bool(entry)) {
+                return WalkAction::Stop;
+            }
+
+            if (prev) {
+                // Entries are equal. Continue.
+                if (!CompareEntries(prev->second, *entry)) {
+                    prev->first = r.Id();
+                    return WalkAction::Continue;
+                }
+                // Report changes. Stop if requester.
+                if (!cb(prev->first, path, odb_.LoadCommit(prev->first))) {
+                    return WalkAction::Stop;
+                }
+            }
+            // Update the changepoint.
+            prev = std::make_pair(r.Id(), *entry);
+
+            return WalkAction::Continue;
+        });
+
+    if (prev) {
+        cb(prev->first, path, odb_.LoadCommit(prev->first));
+    }
 }
 
 Datastore Repository::Objects() {

@@ -8,19 +8,8 @@
 namespace Vcs {
 namespace {
 
-Modifications CompareEntries(const Tree::Entry x, const Tree::Entry y) {
-    Modifications flags;
-
-    flags.content = x.Id() != y.Id();
-
-    if (IsFile(x.Type()) && IsFile(y.Type())) {
-        flags.attributes = (x.Type() == PathType::Executible) != (y.Type() == PathType::Executible);
-        flags.type = (x.Type() == PathType::Symlink) != (y.Type() == PathType::Symlink);
-    } else {
-        flags.type = x.Type() != y.Type();
-    }
-
-    return flags;
+inline Modifications CompareEntries(const Tree::Entry x, const Tree::Entry y) {
+    return CompareEntries(static_cast<PathEntry>(x), static_cast<PathEntry>(y));
 }
 
 Tree GetRoot(const HashId& id, const Datastore& odb) {

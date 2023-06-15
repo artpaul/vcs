@@ -40,4 +40,6 @@ struct Change {
     CommitPath source;
 };
 
+Modifications CompareEntries(const PathEntry& x, const PathEntry& y) noexcept;
+
 } // namespace Vcs

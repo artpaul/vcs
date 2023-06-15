@@ -144,8 +144,18 @@ public:
 
     bool HasPath(const HashId& rev, const std::string_view path) const;
 
-    void Log(
-        const LogOptions& options, const std::function<bool(const HashId& id, const Commit& commit)>& cb
+    /**
+     * Emits list of revisions where the root tree has changed.
+     */
+    void Log(const LogOptions& options, const std::function<bool(const HashId&, const Commit&)>& cb) const;
+
+    /**
+     * Emits list of revisions where the path has changed.
+     */
+    void PathLog(
+        const LogOptions& options,
+        const std::string_view path,
+        const std::function<bool(const HashId& id, const std::string_view, const Commit&)>& cb
     ) const;
 
     /**@}*/
