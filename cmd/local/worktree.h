@@ -22,9 +22,6 @@ public:
     /** Save file to a blob. */
     std::optional<PathEntry> MakeBlob(const std::string& path, Datastore odb) const;
 
-    /** */
-    void SetBaseTree(const HashId& tree_id);
-
 public:
     /** Create directory. */
     void CreateDirectory(const std::string& path);
