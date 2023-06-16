@@ -27,8 +27,14 @@ public:
         /// Compression codec to use.
         Compression codec = Compression::Lz4;
 
+        /// Store content uncompressed  if compression ratio less than (1 - compression_penalty).
+        double compression_penalty = 0.9;
+
         /// Flush in-core data to storage device after write.
         bool data_sync = true;
+
+        /// Group objects by type in pack file.
+        bool group_by_type = true;
 
         /// If true, the store will be opened in read-only mode.
         bool read_only = false;
@@ -46,13 +52,20 @@ public:
     class MemoryTable : public Datastore::Backend {
     public:
         struct Tag {
+            /// Object's metadata.
             DataHeader meta;
-            uint32_t offset;
-            uint32_t portion;
+            /// Stored data is delta.
+            uint64_t delta : 1 {0};
+            /// Offset in data file to a record contained the object.
+            uint64_t offset : 55;
+            /// Index of merging portion.
+            uint64_t portion : 8;
         };
 
+        static_assert(sizeof(Tag) == 16);
+
     public:
-        MemoryTable(File&& file, const size_t capacity, const Compression codec);
+        MemoryTable(const Options& options, File&& file);
 
         /**
          * Content of an object.
@@ -100,15 +113,12 @@ public:
         void Put(const HashId& id, const DataType type, const std::string_view content) override;
 
     private:
+        Options options_;
         File file_;
-        /// Capacity of the table.
-        size_t capacity_{0};
         /// Total size of appended data so far.
         size_t size_{0};
         /// Stored objects.
         std::unordered_map<HashId, Tag> oids_;
-        /// Compression codec to use for processing an appending data.
-        Compression codec_{Compression::None};
         const char* data_{nullptr};
         std::unique_ptr<FileMap> file_map_;
     };
@@ -120,12 +130,27 @@ public:
     public:
         PackTable(const std::filesystem::path& index, const std::filesystem::path& pack);
 
+        /** Converts memtables into a portion format. */
+        static std::shared_ptr<PackTable> MergeMemtables(
+            const std::vector<std::pair<std::shared_ptr<MemoryTable>, std::filesystem::path>>& snapshots,
+            const std::filesystem::path path,
+            const Options& options
+        );
+
         /** Merges multiple packs into a single one. */
-        static std::shared_ptr<PackTable> Merge(
+        static std::pair<std::shared_ptr<PackTable>, size_t> MergePacks(
             const std::vector<std::shared_ptr<PackTable>>& tables,
             const std::filesystem::path& path,
-            size_t level
+            const Options& options
         );
+
+    public:
+        /**
+         * Enumerates all objects in the storage.
+         *
+         * @param cb data receiver.
+         */
+        void Enumerate(const std::function<bool(const HashId&, const DataHeader)>& cb) const;
 
         size_t Size() const noexcept;
 
@@ -174,8 +199,10 @@ public:
 
     /**
      * Merge all memtables.
+     *
+     * @param to_signle if true all packs will be merged into single one.
      */
-    void Pack();
+    void Pack(bool to_signle = false);
 
     /**
      * Finalize current memtable.
@@ -206,18 +233,9 @@ private:
      */
     std::pair<std::shared_ptr<MemoryTable>, std::filesystem::path> MakeMemtable() const;
 
-    void MergeSnapshots();
+    void MergeSnapshots(bool to_signle);
 
-    void FinalizeNoLock(bool pack);
-
-    /**
-     * Converts memtables into portion format.
-     */
-    static std::shared_ptr<PackTable> RepackMemtables(
-        const std::vector<std::pair<std::shared_ptr<MemoryTable>, std::filesystem::path>>& snapshots,
-        const std::filesystem::path path,
-        bool sync
-    );
+    void FinalizeNoLock();
 
 private:
     /// Root directory of the storage.

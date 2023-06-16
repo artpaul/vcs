@@ -54,13 +54,13 @@ void Loose::Enumerate(bool with_metadata, const std::function<bool(const HashId&
 DataHeader Loose::GetMeta(const HashId& id) const try
 {
     auto file = File::ForRead(MakePath(path_, id));
-    Disk::FileHeader hdr{};
+    Disk::LooseHeader hdr{};
     // Read file header.
     if (file.Load(&hdr, sizeof(hdr)) != sizeof(hdr)) {
         throw std::runtime_error("cannot read file header");
     }
     // Validate data integrity.
-    if (hdr.crc != XXH32(&hdr, offsetof(Disk::FileHeader, crc), 0)) {
+    if (hdr.crc != XXH32(&hdr, offsetof(Disk::LooseHeader, crc), 0)) {
         throw std::runtime_error("header data corruption");
     }
     return DataHeader::Make(hdr.Type(), hdr.Size());
@@ -79,13 +79,13 @@ bool Loose::Exists(const HashId& id) const {
 Object Loose::Load(const HashId& id, const DataType expected) const try
 {
     auto file = File::ForRead(MakePath(path_, id));
-    Disk::FileHeader hdr{};
+    Disk::LooseHeader hdr{};
     // Read file header.
     if (file.Load(&hdr, sizeof(hdr)) != sizeof(hdr)) {
         throw std::runtime_error("cannot read file header");
     }
     // Validate data integrity.
-    if (hdr.crc != XXH32(&hdr, offsetof(Disk::FileHeader, crc), 0)) {
+    if (hdr.crc != XXH32(&hdr, offsetof(Disk::LooseHeader, crc), 0)) {
         throw std::runtime_error("header data corruption");
     }
     // Type mismatch.
@@ -143,8 +143,8 @@ void Loose::Put(const HashId& id, const DataType type, const std::string_view co
 
     std::filesystem::create_directories(path_ / id.ToHex().substr(0, 2));
     auto file = File::ForOverwrite(MakePath(path_, id));
-    Disk::FileHeader hdr{};
-    hdr.tag = Disk::FileHeader::MakeTag(options_.codec, type);
+    Disk::LooseHeader hdr{};
+    hdr.tag = Disk::LooseHeader::MakeTag(options_.codec, type);
     hdr.original = content.size();
 
     const auto write_to_file = [&](const void* buf, size_t buf_len) {
@@ -152,7 +152,7 @@ void Loose::Put(const HashId& id, const DataType type, const std::string_view co
         // Setup length of stored data.
         hdr.stored = buf_len;
         // Setup header checksum.
-        hdr.crc = XXH32(&hdr, offsetof(Disk::FileHeader, crc), 0);
+        hdr.crc = XXH32(&hdr, offsetof(Disk::LooseHeader, crc), 0);
         // Write file header.
         file.Write(&hdr, sizeof(hdr));
         // Write file content.

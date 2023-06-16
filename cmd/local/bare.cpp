@@ -363,7 +363,7 @@ Datastore Repository::OpenObjects(const Options& options) {
         auto pack = Store::Leveled::Make(layout_.Packs(), Store::Leveled::Options{.read_only = false});
 
         // Pack all written objects at the end.
-        finalizers_.emplace_back([pack] { pack->Pack(); });
+        finalizers_.emplace_back([pack] { pack->Pack(true); });
 
         return Datastore().Chain(pack);
     }

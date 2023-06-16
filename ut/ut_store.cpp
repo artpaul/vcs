@@ -1,4 +1,5 @@
 #include <vcs/object/serialize.h>
+#include <vcs/store/disk.h>
 #include <vcs/store/memory.h>
 
 #include <contrib/gtest/gtest.h>
@@ -34,6 +35,14 @@ private:
 };
 
 } // namespace
+
+TEST(Datastore, DataTag) {
+    EXPECT_EQ(Store::Disk::DataTag(100, true, false).Length(), 100u);
+    EXPECT_EQ(Store::Disk::DataTag(134217727u, true, true).Length(), 134217727u);
+
+    EXPECT_TRUE(Store::Disk::DataTag(1, true, false).IsCompressed());
+    EXPECT_TRUE(Store::Disk::DataTag(1, false, true).IsDelta());
+}
 
 TEST(Datastore, Cache) {
     auto mem1 = Store::MemoryCache::Make(1024);

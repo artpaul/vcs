@@ -30,11 +30,25 @@ TEST(Utils, SplitPath) {
     check_abc(SplitString<std::string>("a.b.c", '.'));
 }
 
-TEST(Utils, Varlen) {
+TEST(Utils, Varint) {
     uint8_t buf[10];
     uint32_t val = 0;
 
     ASSERT_EQ(EncodeVarint(100, buf, sizeof(buf)), 1u);
     ASSERT_TRUE(DecodeVarint(buf, sizeof(buf), val));
     EXPECT_EQ(val, 100u);
+}
+
+TEST(Utils, VarintSize) {
+    uint8_t buf[10];
+
+    EXPECT_EQ(EncodeVarint(0u, buf, sizeof(buf)), 1u);
+    EXPECT_EQ(EncodeVarint(127u, buf, sizeof(buf)), 1u);
+    EXPECT_EQ(EncodeVarint(128u, buf, sizeof(buf)), 2u);
+    EXPECT_EQ(EncodeVarint(16383u, buf, sizeof(buf)), 2u);
+    EXPECT_EQ(EncodeVarint(16384u, buf, sizeof(buf)), 3u);
+    EXPECT_EQ(EncodeVarint(2097151u, buf, sizeof(buf)), 3u);
+    EXPECT_EQ(EncodeVarint(2097152u, buf, sizeof(buf)), 4u);
+    EXPECT_EQ(EncodeVarint(268435455u, buf, sizeof(buf)), 4u);
+    EXPECT_EQ(EncodeVarint(268435456u, buf, sizeof(buf)), 5u);
 }
