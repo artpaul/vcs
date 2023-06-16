@@ -226,6 +226,9 @@ protected:
 
     /// Finalization routines.
     std::vector<std::function<void()>> finalizers_;
+
+    /// The repository is opened in read-only mode.
+    bool read_only_;
 };
 
 } // namespace Vcs

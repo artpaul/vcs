@@ -79,7 +79,8 @@ auto WorkspaceInfo::Save(const WorkspaceInfo& rec) -> std::string {
 
 Repository::Repository(const std::filesystem::path& path, const Options& options)
     : bare_path_(path)
-    , layout_(path) {
+    , layout_(path)
+    , read_only_(options.read_only) {
     const auto lmdb_options = Lmdb::Options{.read_only = options.read_only};
 
     // Bulk upload cannot be done in read-only mode.
@@ -271,7 +272,7 @@ bool Repository::CreateRemote(const RemoteInfo& remote) {
 
     if (remotes_->Put(remote.name, remote)) {
         // Create directory for branches database.
-        std::filesystem::create_directories(layout_.Remotes() / remote.name);
+        std::filesystem::create_directories(layout_.Remote(remote.name));
         return true;
     } else {
         return false;
@@ -289,7 +290,12 @@ void Repository::ListRemotes(const std::function<void(const RemoteInfo&)>& cb) c
 }
 
 std::unique_ptr<Database<BranchInfo>> Repository::GetRemoteBranches(const std::string_view name) const {
-    return std::make_unique<Database<BranchInfo>>(layout_.Remotes() / name);
+    if (remotes_->Get(name)) {
+        return std::make_unique<Database<BranchInfo>>(
+            layout_.Remote(name), Lmdb::Options{.read_only = read_only_}
+        );
+    }
+    return {};
 }
 
 std::unique_ptr<Fetcher> Repository::GetRemoteFetcher(const std::string_view name) const {

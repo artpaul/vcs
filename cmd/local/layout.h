@@ -25,7 +25,7 @@ public:
         return root_ / "db";
     }
 
-    std::filesystem::path Database(const std::string& name) const {
+    std::filesystem::path Database(const std::string_view name) const {
         return root_ / "db" / name;
     }
 
@@ -52,6 +52,10 @@ public:
         return root_ / "remotes";
     }
 
+    std::filesystem::path Remote(const std::string_view name) const {
+        return root_ / "remotes" / name;
+    }
+
 public:
     /**
      * Location of workspaces.
@@ -60,7 +64,7 @@ public:
         return root_ / "workspaces";
     }
 
-    std::filesystem::path Workspace(const std::string& name) const {
+    std::filesystem::path Workspace(const std::string_view name) const {
         return root_ / "workspaces" / name;
     }
 
