@@ -20,6 +20,8 @@ public:
 
     void Changes(const HashId& from, const HashId& to);
 
+    ChangelistBuilder& SetEmitDirectoryChanged(bool value) noexcept;
+
     ChangelistBuilder& SetExpandAdded(bool value) noexcept;
 
     ChangelistBuilder& SetExpandDeleted(bool value) noexcept;
@@ -48,6 +50,8 @@ private:
     const Datastore& odb_;
     std::function<void(Change)> cb_;
     PathFilter filter_;
+    /// Emit change event for directories.
+    bool emit_directory_changed_ = false;
     /// Expand content of created directories.
     bool expand_added_ = true;
     /// Expand content of deleted directories.

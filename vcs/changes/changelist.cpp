@@ -43,6 +43,11 @@ ChangelistBuilder::ChangelistBuilder(const Datastore& odb, std::vector<Change>& 
     , cb_([&changes](Change change) { changes.push_back(std::move(change)); }) {
 }
 
+ChangelistBuilder& ChangelistBuilder::SetEmitDirectoryChanged(bool value) noexcept {
+    emit_directory_changed_ = value;
+    return *this;
+}
+
 ChangelistBuilder& ChangelistBuilder::SetExpandAdded(bool value) noexcept {
     expand_added_ = value;
     return *this;
@@ -61,6 +66,15 @@ ChangelistBuilder& ChangelistBuilder::SetInclude(PathFilter value) noexcept {
 void ChangelistBuilder::Changes(const HashId& from, const HashId& to) {
     if (from == to) {
         return;
+    }
+
+    if (emit_directory_changed_) {
+        const auto t1 = from ? GetTreeId(from, odb_) : HashId();
+        const auto t2 = to ? GetTreeId(to, odb_) : HashId();
+
+        if (t1 != t2) {
+            EmitChange(std::string(), PathType::Directory, Modifications{.content = true});
+        }
     }
 
     TreeChanges(std::string(), GetRoot(from, odb_), GetRoot(to, odb_));
@@ -127,6 +141,9 @@ void ChangelistBuilder::ProcessChanged(
         } else if (IsFile(from.Type())) {
             EmitChange(path, from.Type(), flags);
         } else if (IsDirectory(to.Type())) {
+            if (emit_directory_changed_) {
+                EmitChange(path, PathType::Directory, flags);
+            }
             if (filter_.IsParent(path)) {
                 TreeChanges(path, odb_.LoadTree(from.Id()), odb_.LoadTree(to.Id()));
             }

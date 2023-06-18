@@ -80,6 +80,42 @@ TEST(ChangelistBuilder, Changes) {
     EXPECT_EQ(changes[4].path, "util/string.h");
 }
 
+TEST(ChangelistBuilder, ChangesWithTrees) {
+    auto mem = Datastore::Make<Store::MemoryCache>();
+
+    HashId tree_lib = MakeTreeLib(mem);
+    HashId tree_util = MakeTreeUtil(mem);
+
+    std::vector<Change> changes;
+    ChangelistBuilder(mem, changes).SetEmitDirectoryChanged(true).Changes(tree_lib, tree_util);
+
+    ASSERT_EQ(changes.size(), 7u);
+
+    EXPECT_EQ(changes[0].action, PathAction::Change);
+    EXPECT_EQ(changes[0].type, PathType::Directory);
+    EXPECT_EQ(changes[0].path, "");
+
+    EXPECT_EQ(changes[1].action, PathAction::Delete);
+    EXPECT_EQ(changes[1].path, "bin/main.cpp");
+
+    EXPECT_EQ(changes[2].action, PathAction::Delete);
+    EXPECT_EQ(changes[2].path, "bin");
+
+    EXPECT_EQ(changes[3].action, PathAction::Change);
+    EXPECT_EQ(changes[3].type, PathType::Directory);
+    EXPECT_EQ(changes[3].path, "lib");
+
+    EXPECT_EQ(changes[4].action, PathAction::Change);
+    EXPECT_EQ(changes[4].path, "lib/test.h");
+
+    EXPECT_EQ(changes[5].action, PathAction::Add);
+    EXPECT_EQ(changes[5].type, PathType::Directory);
+    EXPECT_EQ(changes[5].path, "util");
+
+    EXPECT_EQ(changes[6].action, PathAction::Add);
+    EXPECT_EQ(changes[6].path, "util/string.h");
+}
+
 TEST(ChangelistBuilder, ChangesNoDirectoryExpansion) {
     auto mem = Datastore::Make<Store::MemoryCache>();
 
