@@ -117,9 +117,10 @@ public:
 
             HashId last;
             // Converting commits.
-            for (const auto& id : ids) {
+            for (size_t i = 0, end = ids.size(); i != end; ++i) {
+                const auto& id = ids[i];
                 auto collect = Store::Collect::Make();
-                cb(fmt::format("converting git {}...", id));
+                cb(fmt::format("converting git {}... ({}/{})", id, i + 1, end));
                 last = converter.ConvertCommit(id, odb.Chain(collect));
 
                 if (last) {
