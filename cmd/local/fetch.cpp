@@ -38,7 +38,7 @@ public:
         }
 
         // Open git repository.
-        Git::Converter converter(path_, Git::Converter::Options());
+        Git::Converter converter(path_, Git::Converter::Options{.use_blob_chache = true});
 
         // Populate list of remote branches.
         converter.ListBranches([&](const std::string& name, const HashId& head) {
