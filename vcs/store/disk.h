@@ -13,51 +13,6 @@ namespace Vcs::Store::Disk {
 static constexpr size_t kMaximumContentSize = (128u << 20) - 1u;
 
 /**
- * Tag for records in pack file.
- */
-struct alignas(1) DataTag {
-    // |----------------------------------------------------------------|
-    // |                  The layout of data field                      |
-    // |---------------->------------------|--------------<-------------|
-    // | compressed : 1 | delta : 1  | : 3 |         size : 27          |
-    // |----------------|------------|-----|----------------------------|
-
-    uint8_t data[4];
-
-public:
-    constexpr DataTag() noexcept = default;
-
-    constexpr DataTag(const uint32_t size, bool compressed, bool delta) noexcept {
-        data[0] = ((size >> 24) & 0x07) | (compressed ? 0x80u : 0u) | (delta ? 0x40u : 0u);
-        data[1] = ((size >> 16) & 0xFF);
-        data[2] = ((size >> 8) & 0xFF);
-        data[3] = ((size >> 0) & 0xFF);
-    }
-
-public:
-    /** The content is compressed. */
-    constexpr bool IsCompressed() const noexcept {
-        return (data[0] & 0x80) != 0;
-    }
-
-    /** The content is delta. */
-    constexpr bool IsDelta() const noexcept {
-        return (data[0] & 0x40) != 0;
-    }
-
-    /** Length of the content. */
-    constexpr uint32_t Length() const noexcept {
-        return uint32_t((data[3])) | uint32_t((data[2]) << 8) | uint32_t((data[1]) << 16)
-             | uint32_t((data[0] & 0x07) << 24);
-    }
-};
-
-/// Ensure DataTag has expected size.
-static_assert(sizeof(DataTag) == 4);
-/// Ensure DataTag is trivially copyable.
-static_assert(std::is_trivially_copyable_v<DataTag>);
-
-/**
  * Header entry for loose and pack storage.
  */
 struct alignas(4) LooseHeader {
@@ -123,15 +78,11 @@ static_assert(std::numeric_limits<decltype(LooseHeader::original)>::max() >= kMa
 /**
  * Index entry for pack storage.
  */
-struct alignas(alignof(HashId)) IndexEntry {
-    /// Key.
-    HashId oid;
+struct alignas(1) IndexTag {
     /// Packed header and offset.
     std::byte tag[12];
 
-    IndexEntry(const HashId& id, const DataHeader hdr, const uint64_t offset) {
-        // Set key.
-        oid = id;
+    IndexTag(const DataHeader hdr, const uint64_t offset) {
         // Set header.
         std::memcpy(tag, hdr.Data(), hdr.Bytes());
         // Set offset.
@@ -141,12 +92,14 @@ struct alignas(alignof(HashId)) IndexEntry {
         }
     }
 
+    /** Object's header.*/
     DataHeader Meta() const noexcept {
         DataHeader hdr;
         std::memcpy(&hdr, tag, sizeof(hdr));
         return DataHeader::Make(hdr.Type(), hdr.Size());
     }
 
+    /** Offset in data file to the beginning of object's record. */
     uint64_t Offset() const noexcept {
         DataHeader hdr;
         uint64_t value;
@@ -156,11 +109,56 @@ struct alignas(alignof(HashId)) IndexEntry {
     }
 };
 
-/// Ensure IndexEntry has expected size.
-static_assert(sizeof(IndexEntry) == 32);
-/// Ensure IndexEntry is 32-bit aligned.
-static_assert(std::alignment_of<IndexEntry>::value == std::alignment_of<uint32_t>::value);
-/// Ensure IndexEntry is trivially copyable.
-static_assert(std::is_trivially_copyable_v<IndexEntry>);
+/// Ensure IndexTag has expected size.
+static_assert(sizeof(IndexTag) == 12);
+/// Ensure IndexTag is 8-bit aligned.
+static_assert(std::alignment_of<IndexTag>::value == std::alignment_of<std::byte>::value);
+/// Ensure IndexTag is trivially copyable.
+static_assert(std::is_trivially_copyable_v<IndexTag>);
+
+/**
+ * Tag for records in pack file.
+ */
+struct alignas(1) DataTag {
+    // |----------------------------------------------------------------|
+    // |                  The layout of data field                      |
+    // |---------------->------------------|--------------<-------------|
+    // | compressed : 1 | delta : 1  | : 3 |         size : 27          |
+    // |----------------|------------|-----|----------------------------|
+
+    uint8_t data[4];
+
+public:
+    constexpr DataTag() noexcept = default;
+
+    constexpr DataTag(const uint32_t size, bool compressed, bool delta) noexcept {
+        data[0] = ((size >> 24) & 0x07) | (compressed ? 0x80u : 0u) | (delta ? 0x40u : 0u);
+        data[1] = ((size >> 16) & 0xFF);
+        data[2] = ((size >> 8) & 0xFF);
+        data[3] = ((size >> 0) & 0xFF);
+    }
+
+public:
+    /** The content is compressed. */
+    constexpr bool IsCompressed() const noexcept {
+        return (data[0] & 0x80) != 0;
+    }
+
+    /** The content is delta. */
+    constexpr bool IsDelta() const noexcept {
+        return (data[0] & 0x40) != 0;
+    }
+
+    /** Length of the content. */
+    constexpr uint32_t Length() const noexcept {
+        return uint32_t((data[3])) | uint32_t((data[2]) << 8) | uint32_t((data[1]) << 16)
+             | uint32_t((data[0] & 0x07) << 24);
+    }
+};
+
+/// Ensure DataTag has expected size.
+static_assert(sizeof(DataTag) == 4);
+/// Ensure DataTag is trivially copyable.
+static_assert(std::is_trivially_copyable_v<DataTag>);
 
 } // namespace Vcs::Store::Disk

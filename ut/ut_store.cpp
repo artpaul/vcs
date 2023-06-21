@@ -44,6 +44,41 @@ TEST(Datastore, DataTag) {
     EXPECT_TRUE(Store::Disk::DataTag(1, false, true).IsDelta());
 }
 
+TEST(Datastore, Fanout) {
+    std::vector<uint32_t> fanout(256, 0);
+    std::vector<uint8_t> oids = {0x02, 0x02, 0x02, 0x04, 0x59, 0x59, 0xaa, 0xfb, 0xfd};
+
+    // Build fanout table.
+    for (auto it = oids.begin(), end = oids.end(); it != end;) {
+        const auto next =
+            std::upper_bound(it, end, *it, [](const auto& val, const auto& item) { return val < item; });
+
+        fanout[*it] = next - oids.begin();
+
+        it = next;
+    }
+    // Fill fanout gaps.
+    for (size_t i = 1, end = fanout.size() - 1; i != end; ++i) {
+        if (fanout[i] == 0) {
+            fanout[i] += fanout[i - 1];
+        }
+    }
+    // Last cell always holds the total number of oids in the index.
+    fanout[fanout.size() - 1] = oids.size();
+
+    EXPECT_EQ(fanout[0x00], 0u);
+    EXPECT_EQ(fanout[0x01], 0u);
+    EXPECT_EQ(fanout[0x02], 3u);
+    EXPECT_EQ(fanout[0x03], 3u);
+    EXPECT_EQ(fanout[0x04], 4u);
+    EXPECT_EQ(fanout[0x59], 6u);
+    EXPECT_EQ(fanout[0x70], 6u);
+    EXPECT_EQ(fanout[0xaa], 7u);
+    EXPECT_EQ(fanout[0xfb], 8u);
+    EXPECT_EQ(fanout[0xfd], 9u);
+    EXPECT_EQ(fanout[0xff], oids.size());
+}
+
 TEST(Datastore, Cache) {
     auto mem1 = Store::MemoryCache::Make(1024);
     auto mem2 = Store::MemoryCache::Make(1024);

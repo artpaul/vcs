@@ -161,39 +161,50 @@ private:
         return std::make_pair(builder.Build(), offset);
     }
 
+    /**
+     * Builds and writes pack index.
+     */
     void WriteIndex(const std::filesystem::path& path) const {
-        // Build index.
-        std::vector<Disk::IndexEntry> index;
+        std::vector<uint32_t> fanout(256, 0);
+        std::vector<HashId> oids;
+        std::vector<Disk::IndexTag> index;
         // Allocate memory.
         index.reserve(oids_.size());
+        oids.reserve(oids_.size());
         // Fill the index.
         for (size_t i = 0, end = oids_.size(); i != end; ++i) {
             const auto& [id, tag] = oids_[i];
 
-            index.emplace_back(id, tag.meta, offsets_[i]);
+            index.emplace_back(tag.meta, offsets_[i]);
+            oids.emplace_back(id);
         }
 
         // Build fanout table.
-        std::vector<uint32_t> fanout(256, index.size());
-
-        for (auto it = index.begin(), end = index.end(); it != end;) {
-            fanout[it->oid.Data()[0]] = it - index.begin();
-
-            it = std::upper_bound(it, end, it->oid, [](const auto& val, const auto& item) {
-                return val.Data()[0] < item.oid.Data()[0];
+        // Each cell of the table holds the count of oids so far.
+        for (auto it = oids.begin(), end = oids.end(); it != end;) {
+            const auto next = std::upper_bound(it, end, *it, [](const auto& val, const auto& item) {
+                return val.Data()[0] < item.Data()[0];
             });
+
+            fanout[it->Data()[0]] = next - oids.begin();
+
+            it = next;
         }
         // Fill fanout gaps.
-        for (ssize_t i = (ssize_t)fanout.size() - 2; i >= 0; --i) {
-            if (fanout[i] == index.size()) {
-                fanout[i] = fanout[i + 1];
+        for (size_t i = 1, end = fanout.size() - 1; i != end; ++i) {
+            if (fanout[i] == 0) {
+                fanout[i] += fanout[i - 1];
             }
         }
+        // Last cell always holds the total number of oids in the index.
+        fanout[fanout.size() - 1] = oids.size();
 
         File index_file = File::ForAppend(path);
         // Write fanout table.
         index_file.Write(fanout.data(), fanout.size() * sizeof(decltype(fanout)::value_type));
-        // Write index.
+        // Write oids.
+        index_file.Write(oids.data(), oids.size() * sizeof(decltype(oids)::value_type));
+        // Write metadata.
         index_file.Write(index.data(), index.size() * sizeof(decltype(index)::value_type));
         // Ensure data has been written to disk.
         if (options_.data_sync) {
@@ -209,24 +220,41 @@ private:
     std::vector<uint64_t> offsets_;
 };
 
-std::optional<Disk::IndexEntry> FindIndexEntry(const HashId& id, const std::span<const std::byte> buf) {
-    std::span<const uint32_t, 256> fanout(reinterpret_cast<const uint32_t*>(buf.data()), 256);
+std::tuple<std::span<const uint32_t, 256>, std::span<const HashId>, std::span<const Disk::IndexTag>>
+MakeIndexLayout(const std::span<const std::byte> buf) {
+    // Fanout table.
+    const std::span<const uint32_t, 256> fanout(reinterpret_cast<const uint32_t*>(buf.data()), 256);
 
-    std::span<const Disk::IndexEntry> index(
-        reinterpret_cast<const Disk::IndexEntry*>(reinterpret_cast<const uint32_t*>(buf.data()) + 256),
-        reinterpret_cast<const Disk::IndexEntry*>(buf.data() + buf.size())
+    const std::byte* const oids_begin = buf.data() + (256 * sizeof(uint32_t));
+    const std::byte* const oids_end = oids_begin + (fanout[255] * sizeof(HashId));
+
+    // Oids table.
+    const std::span<const HashId> oids(
+        reinterpret_cast<const HashId*>(oids_begin), reinterpret_cast<const HashId*>(oids_end)
     );
 
+    // Tags table.
+    const std::span<const Disk::IndexTag> tags(
+        reinterpret_cast<const Disk::IndexTag*>(oids_end),
+        reinterpret_cast<const Disk::IndexTag*>(oids_end + (fanout[255] * sizeof(Disk::IndexTag)))
+    );
+
+    return std::make_tuple(fanout, oids, tags);
+}
+
+const Disk::IndexTag* FindIndexEntry(const HashId& id, const std::span<const std::byte> buf) {
+    const auto [fanout, oids, tags] = MakeIndexLayout(buf);
+
     const auto f = id.Data()[0];
-    const auto l = index.begin() + fanout[f];
-    const auto r = index.begin() + (f == 0xFF ? index.size() : fanout[f + 1]);
+    const auto l = oids.begin() + (f == 0x00 ? 0 : fanout[f - 1]);
+    const auto r = oids.begin() + fanout[f];
 
-    auto oi = std::lower_bound(l, r, id, [](const auto& item, const auto& id) { return item.oid < id; });
-
-    if (oi != r && oi->oid == id) {
-        return *oi;
+    const auto oi = std::lower_bound(l, r, id, [](const auto& item, const auto& id) { return item < id; });
+    // Check if something was found.
+    if (oi != r && *oi == id) {
+        return &tags[oi - oids.begin()];
     } else {
-        return {};
+        return nullptr;
     }
 }
 
@@ -490,16 +518,14 @@ Leveled::PackTable::PackTable(const std::filesystem::path& index, const std::fil
 }
 
 void Leveled::PackTable::Enumerate(const std::function<bool(const HashId&, const DataHeader)>& cb) const {
-    std::span<const Disk::IndexEntry> index(
-        reinterpret_cast<const Disk::IndexEntry*>(reinterpret_cast<const uint32_t*>(index_.data()) + 256),
-        reinterpret_cast<const Disk::IndexEntry*>(index_.data() + index_.size())
-    );
+    const auto [_, oids, tags] = MakeIndexLayout(index_);
 
     if (!cb) {
         return;
     }
-    for (const auto& e : index) {
-        if (!cb(e.oid, e.Meta())) {
+
+    for (size_t i = 0, end = oids.size(); i != end; ++i) {
+        if (!cb(oids[i], tags[i].Meta())) {
             break;
         }
     }
@@ -514,14 +540,14 @@ bool Leveled::PackTable::Exists(const HashId& id) const {
 }
 
 DataHeader Leveled::PackTable::GetMeta(const HashId& id) const {
-    if (const auto& entry = FindIndexEntry(id, index_)) {
+    if (const auto entry = FindIndexEntry(id, index_)) {
         return entry->Meta();
     }
     return DataHeader();
 }
 
 Object Leveled::PackTable::Load(const HashId& id, const DataType expected) const {
-    const auto& entry = FindIndexEntry(id, index_);
+    const auto entry = FindIndexEntry(id, index_);
     // No object.
     if (!entry) {
         return Object();
@@ -617,20 +643,14 @@ std::pair<std::shared_ptr<Leveled::PackTable>, size_t> Leveled::PackTable::Merge
         path,
         // Fill oids.
         [&](std::vector<std::pair<HashId, Leveled::MemoryTable::Tag>>& oids) {
-            for (size_t i = 0; i < tables.size(); ++i) {
-                std::span<const Disk::IndexEntry> index(
-                    reinterpret_cast<const Disk::IndexEntry*>(
-                        reinterpret_cast<const uint32_t*>(tables[i]->index_.data()) + 256
-                    ),
-                    reinterpret_cast<const Disk::IndexEntry*>(
-                        tables[i]->index_.data() + tables[i]->index_.size()
-                    )
-                );
+            for (size_t t = 0; t < tables.size(); ++t) {
+                const auto [_, ids, tags] = MakeIndexLayout(tables[t]->index_);
 
-                for (const auto& e : index) {
+                for (size_t i = 0, end = ids.size(); i != end; ++i) {
                     oids.emplace_back(
-                        e.oid,
-                        MemoryTable::Tag{.meta = e.Meta(), .offset = e.Offset(), .portion = uint32_t(i)}
+                        ids[i],
+                        MemoryTable::Tag{
+                            .meta = tags[i].Meta(), .offset = tags[i].Offset(), .portion = uint32_t(t)}
                     );
                 }
             }
