@@ -22,6 +22,8 @@ struct Options {
     uint64_t count = std::numeric_limits<uint64_t>::max();
     /// Coloring mode.
     ColorMode coloring = ColorMode::Auto;
+    /// Follow only the first parent commit upon seeing a merge commit.
+    bool first_parent = false;
     /// Use only one line for each log entry.
     bool oneline = false;
 };
@@ -84,10 +86,10 @@ int Execute(const Options& options, const Workspace& repo) {
     };
 
     if (options.path.empty()) {
-        repo.Log(LogOptions().Push(options.head), cb);
+        repo.Log(LogOptions().Push(options.head).SetFirstParent(options.first_parent), cb);
     } else {
         repo.PathLog(
-            LogOptions().Push(options.head), options.path,
+            LogOptions().Push(options.head).SetFirstParent(options.first_parent), options.path,
             [&](const HashId& id, const std::string_view, const Commit& c) { return cb(id, c); }
         );
     }
@@ -108,6 +110,8 @@ int ExecuteLog(int argc, char* argv[], const std::function<Workspace&()>& cb) {
                 {"h,help", "print help"},
                 {"n", "number of commits to output", cxxopts::value<uint64_t>(options.count)},
                 {"oneline", "one commit per line", cxxopts::value<bool>(options.oneline)},
+                {"first-parent", "follow only the first parent commit",
+                 cxxopts::value<bool>(options.first_parent)},
                 {"color", "coloring mode [always|auto|none]", cxxopts::value<std::string>(), "<mode>"},
                 {"args", "free args", cxxopts::value<std::vector<std::string>>()},
             }
