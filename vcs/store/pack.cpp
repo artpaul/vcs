@@ -752,7 +752,11 @@ void Leveled::Rotate() {
 }
 
 bool Leveled::Exists(const HashId& id) const {
-    std::shared_lock lock(mutex_);
+    std::shared_lock lock(mutex_, std::defer_lock_t());
+
+    if (!options_.read_only) {
+        lock.lock();
+    }
 
     for (auto ri = snapshots_.rbegin(); ri != snapshots_.rend(); ++ri) {
         if (ri->first->Exists(id)) {
@@ -772,7 +776,11 @@ bool Leveled::Exists(const HashId& id) const {
 }
 
 DataHeader Leveled::GetMeta(const HashId& id) const {
-    std::shared_lock lock(mutex_);
+    std::shared_lock lock(mutex_, std::defer_lock_t());
+
+    if (!options_.read_only) {
+        lock.lock();
+    }
 
     for (auto ri = snapshots_.rbegin(); ri != snapshots_.rend(); ++ri) {
         if (auto meta = ri->first->GetMeta(id)) {
@@ -792,7 +800,11 @@ DataHeader Leveled::GetMeta(const HashId& id) const {
 }
 
 Object Leveled::Load(const HashId& id, const DataType expected) const {
-    std::shared_lock lock(mutex_);
+    std::shared_lock lock(mutex_, std::defer_lock_t());
+
+    if (!options_.read_only) {
+        lock.lock();
+    }
 
     for (auto ri = snapshots_.rbegin(); ri != snapshots_.rend(); ++ri) {
         if (Object obj = ri->first->Load(id, expected)) {
@@ -910,11 +922,16 @@ void Leveled::LoadSnapshots(const std::filesystem::path& path) {
             continue;
         }
 
-        if (li->second >= levels_.size()) {
-            levels_.resize(li->second + 1);
-        }
+        if (options_.read_only) {
+            levels_.resize(1);
+            levels_[0].emplace_back(std::make_shared<PackTable>(paths.first, paths.second));
+        } else {
+            if (li->second >= levels_.size()) {
+                levels_.resize(li->second + 1);
+            }
 
-        levels_[li->second].emplace_back(std::make_shared<PackTable>(paths.first, paths.second));
+            levels_[li->second].emplace_back(std::make_shared<PackTable>(paths.first, paths.second));
+        }
     }
 
     // Load snapshots.
