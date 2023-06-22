@@ -187,7 +187,6 @@ private:
 class Object final : public ObjectBase<Object> {
 public:
     constexpr Object() noexcept = default;
-    ~Object();
 
     /** Loads object content. */
     static Object Load(const DataType type, const std::string_view content);
@@ -459,6 +458,10 @@ class Tree final : public ObjectBase<Tree> {
 public:
     class Entry {
     public:
+        constexpr Entry() noexcept
+            : p_(nullptr) {
+        }
+
         explicit constexpr Entry(const void* p) noexcept
             : p_(p) {
             assert(p_);
@@ -482,6 +485,11 @@ public:
         /// Constructs PathEntry.
         explicit operator PathEntry() const;
 
+        /// Check validity.
+        explicit constexpr operator bool() const noexcept {
+            return p_ != nullptr;
+        }
+
     private:
         const void* const p_;
     };
@@ -500,7 +508,7 @@ public:
     RepeatedField<Entry, RangeEntries> Entries() const;
 
     /// Finds entry by name.
-    std::optional<Entry> Find(const std::string_view name) const;
+    Entry Find(const std::string_view name) const;
 
     /// Tree has no entries.
     bool Empty() const;

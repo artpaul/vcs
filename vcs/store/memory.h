@@ -2,8 +2,8 @@
 
 #include <vcs/object/store.h>
 
+#include <absl/container/flat_hash_map.h>
 #include <list>
-#include <unordered_map>
 
 namespace Vcs::Store {
 
@@ -41,7 +41,7 @@ private:
     size_t capacity_;
     size_t size_;
     mutable UsageList list_;
-    std::unordered_map<HashId, UsageList::iterator> objects_;
+    absl::flat_hash_map<HashId, UsageList::iterator> objects_;
 };
 
 } // namespace Vcs::Store

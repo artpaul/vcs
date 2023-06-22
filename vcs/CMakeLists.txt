@@ -38,6 +38,9 @@ target_include_directories(libvcs3 SYSTEM PUBLIC
 )
 
 target_link_libraries(libvcs3 PUBLIC
+    absl::flat_hash_map
+    absl::synchronization
+
     contrib-flatbuffers
     contrib-fmt
     contrib-gdelta
@@ -46,6 +49,7 @@ target_link_libraries(libvcs3 PUBLIC
     contrib-sha
     contrib-tlsh
     contrib-xxhash
+
     vcs-util
 )
 

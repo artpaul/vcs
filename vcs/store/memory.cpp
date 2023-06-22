@@ -22,7 +22,7 @@ DataHeader MemoryCache::GetMeta(const HashId& id) const {
 }
 
 bool MemoryCache::Exists(const HashId& id) const {
-    return objects_.find(id) != objects_.end();
+    return objects_.contains(id);
 }
 
 Object MemoryCache::Load(const HashId& id, const DataType expected) const {
@@ -49,10 +49,12 @@ void MemoryCache::Put(const HashId& id, const Object& obj) {
 }
 
 void MemoryCache::InsertObject(const HashId& id, Object obj) {
-    if (auto oi = objects_.emplace(id, list_.end()); oi.second) {
+    if (auto [oi, inserted] = objects_.emplace(id, list_.end()); inserted) {
         size_ += obj.Size();
         // Replace iterator with the real value.
-        oi.first->second = list_.insert(list_.end(), std::make_pair(id, std::move(obj)));
+        oi->second = list_.insert(list_.end(), std::make_pair(id, std::move(obj)));
+    } else {
+        return;
     }
     // Free memory.
     while (!list_.empty() && size_ > capacity_) {

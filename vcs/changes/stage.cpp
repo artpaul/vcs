@@ -360,11 +360,11 @@ std::optional<PathEntry> StageArea::GetPathEntry(
     Tree tree = odb_.LoadTree(id);
 
     for (size_t i = 0; i < parts.size(); ++i) {
-        if (const auto& e = tree.Find(parts[i])) {
+        if (const auto e = tree.Find(parts[i])) {
             if (i + 1 == parts.size()) {
-                return PathEntry{.id = e->Id(), .data = e->Data(), .type = e->Type(), .size = e->Size()};
-            } else if (IsDirectory(e->Type())) {
-                tree = odb_.LoadTree(e->Id());
+                return PathEntry{.id = e.Id(), .data = e.Data(), .type = e.Type(), .size = e.Size()};
+            } else if (IsDirectory(e.Type())) {
+                tree = odb_.LoadTree(e.Id());
             } else {
                 break;
             }

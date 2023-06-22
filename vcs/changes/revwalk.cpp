@@ -2,12 +2,11 @@
 
 #include <util/arena.h>
 
+#include <absl/container/flat_hash_map.h>
+#include <absl/synchronization/mutex.h>
 #include <cassert>
 #include <limits>
-#include <mutex>
 #include <queue>
-#include <shared_mutex>
-#include <unordered_map>
 
 namespace Vcs {
 
@@ -18,7 +17,7 @@ public:
     }
 
     Revision Push(const HashId& id, const Commit& commit) {
-        std::unique_lock lock(mutex_);
+        absl::WriterMutexLock lock(&mutex_);
         // Allocate memory for a revision record.
         auto buf = arena_.Allocate(
             sizeof(Format::Record) + (2 + commit.Parents().size()) * sizeof(HashId), alignof(Format::Record)
@@ -49,7 +48,7 @@ public:
     }
 
     std::optional<Revision> GetRevision(const HashId& id) const override {
-        std::shared_lock lock(mutex_);
+        absl::ReaderMutexLock lock(&mutex_);
         if (auto ci = commits_.find(id); ci != commits_.end()) {
             return ci->second;
         }
@@ -66,11 +65,11 @@ public:
     }
 
 private:
-    mutable std::shared_mutex mutex_;
+    mutable absl::Mutex mutex_;
     /// Memory storage.
     Arena arena_;
     /// Index of the stored commits.
-    std::unordered_map<HashId, Revision> commits_;
+    absl::flat_hash_map<HashId, Revision> commits_;
 };
 
 RevisionGraph::Walker::Walker(const RevisionGraph& graph) noexcept

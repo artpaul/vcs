@@ -50,8 +50,6 @@ Object::Object(std::shared_ptr<std::byte[]>&& data) noexcept
     : ObjectBase(std::move(data)) {
 }
 
-Object::~Object() = default;
-
 Object Object::Load(const DataType type, const std::string_view content) {
     auto buf = std::make_shared_for_overwrite<std::byte[]>(sizeof(Adaptor::Tag) + content.size());
     // Set object's tag.
@@ -464,7 +462,7 @@ RepeatedField<Tree::Entry, Tree::RangeEntries> Tree::Entries() const {
     return RepeatedField<Entry, RangeEntries>(Fbs::GetTree(Adaptor::GetData(data_.get()))->entries());
 }
 
-std::optional<Tree::Entry> Tree::Find(const std::string_view name) const {
+Tree::Entry Tree::Find(const std::string_view name) const {
     if (const auto entries = Fbs::GetTree(Adaptor::GetData(data_.get()))->entries()) {
         size_t l = 0;
         size_t r = entries->size();
@@ -483,7 +481,7 @@ std::optional<Tree::Entry> Tree::Find(const std::string_view name) const {
             }
         }
     }
-    return std::nullopt;
+    return {};
 }
 
 bool Tree::Empty() const {

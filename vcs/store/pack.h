@@ -6,6 +6,7 @@
 #include <util/file.h>
 #include <util/varint.h>
 
+#include <absl/synchronization/mutex.h>
 #include <filesystem>
 #include <mutex>
 #include <numeric>
@@ -180,7 +181,7 @@ public:
         std::span<const std::byte> data_;
         std::span<const std::byte> index_;
 
-        mutable std::mutex mutex_;
+        mutable absl::Mutex mutex_;
         std::shared_ptr<Datastore::Backend> cache_;
     };
 

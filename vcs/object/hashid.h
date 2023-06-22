@@ -78,13 +78,11 @@ public:
 
 public:
     explicit operator bool() const noexcept {
-        uint32_t data[5];
+        static constexpr unsigned char zeroes[20] = {};
         // Ensure same size.
-        static_assert(sizeof(data) == sizeof(data_));
-        // Type punning.
-        std::memcpy(data, data_, sizeof(data_));
+        static_assert(sizeof(zeroes) == sizeof(data_));
         // Check for non null.
-        return data[0] | data[1] | data[2] | data[3] | data[4];
+        return std::memcmp(zeroes, data_, sizeof(data_)) != 0;
     }
 
     bool operator<(const HashId& other) const noexcept {
@@ -130,8 +128,14 @@ template <>
 class std::hash<Vcs::HashId> {
 public:
     std::size_t operator()(const Vcs::HashId& id) const noexcept {
-        size_t hash;
-        std::memcpy(&hash, id.Data() + 4, sizeof(hash));
-        return hash;
+        constexpr auto align_offset = (std::alignment_of_v<std::size_t> - std::alignment_of_v<Vcs::HashId>);
+        // Ensure align_offset is positive.
+        static_assert(std::alignment_of_v<std::size_t> >= std::alignment_of_v<Vcs::HashId>);
+        // Ensure no buffer overrun.
+        static_assert(sizeof(decltype(id.Data())) >= ((sizeof(std::size_t) + align_offset)));
+
+        return *std::bit_cast<const std::size_t*>(
+            std::bit_cast<const unsigned char*>(&id.Data()) + align_offset
+        );
     }
 };

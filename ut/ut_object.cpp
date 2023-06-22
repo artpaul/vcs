@@ -148,11 +148,10 @@ TEST(ObjectTree, Find) {
     ASSERT_EQ(tree.Entries()[1].Name(), "test.txt");
     ASSERT_EQ(tree.Entries()[1].Type(), PathType::File);
     // Test find.
-    EXPECT_EQ(tree.Find("main.cpp")->Name(), "main.cpp");
-    EXPECT_EQ(tree.Find("test.txt")->Name(), "test.txt");
+    EXPECT_EQ(tree.Find("main.cpp").Name(), "main.cpp");
+    EXPECT_EQ(tree.Find("test.txt").Name(), "test.txt");
 
-    EXPECT_FALSE(CompareEntries(static_cast<PathEntry>(*tree.Find("test.txt")), MakeBlobEntry("text file"))
-    );
+    EXPECT_FALSE(CompareEntries(static_cast<PathEntry>(tree.Find("test.txt")), MakeBlobEntry("text file")));
 }
 
 TEST(ObjectTree, Serialize) {

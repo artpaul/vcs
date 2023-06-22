@@ -764,15 +764,6 @@ Object Leveled::PackTable::Load(const HashId& id, const DataType expected) const
 
     // Collect parts.
     for (HashId base_id = id; true;) {
-        {
-            std::lock_guard g(mutex_);
-
-            if (auto obj = cache_->Load(base_id, expected)) {
-                base = obj;
-                break;
-            }
-        }
-
         const auto entry = FindIndexEntry(base_id, index_);
         // No object.
         if (!entry) {
@@ -781,24 +772,33 @@ Object Leveled::PackTable::Load(const HashId& id, const DataType expected) const
 
         const auto offset = entry->Offset();
         const auto data = data_.data() + offset + sizeof(Disk::DataTag);
-        Disk::DataTag tag;
 
         // Load content's size.
-        if (offset + sizeof(tag) > data_.size()) {
+        if (offset + sizeof(Disk::DataTag) > data_.size()) {
             throw std::runtime_error("cannot load length (overflow)");
-        } else {
-            std::memcpy(&tag, data_.data() + offset, sizeof(tag));
         }
+
+        const Disk::DataTag* tag = std::bit_cast<const Disk::DataTag*>(data_.data() + offset);
+
         // Ensure no buffer overrun.
-        if (offset + sizeof(tag) + tag.Length() > data_.size()) {
+        if (offset + sizeof(Disk::DataTag) + tag->Length() > data_.size()) {
             throw std::runtime_error("cannot load content (overflow)");
         }
 
-        parts.emplace_back(entry, data, base_id, tag);
+        if (tag->IsDelta()) {
+            {
+                absl::MutexLock lock(&mutex_);
 
-        if (tag.IsDelta()) {
+                if (auto obj = cache_->Load(base_id, expected)) {
+                    base = obj;
+                    break;
+                }
+            }
+
+            parts.emplace_back(entry, data, base_id, *tag);
             base_id = HashId::FromBytes(data, sizeof(HashId));
         } else {
+            parts.emplace_back(entry, data, base_id, *tag);
             break;
         }
     }
@@ -824,7 +824,7 @@ Object Leveled::PackTable::Load(const HashId& id, const DataType expected) const
         if (tag.IsDelta()) {
             base = Object::Load(std::get<0>(parts[i])->Meta(), [&](std::byte* buf, size_t buf_len) {
                 uint32_t delta_len = 0;
-                uint8_t* delta_buf = nullptr;
+                const uint8_t* delta_buf = nullptr;
                 std::unique_ptr<char[]> tmp_buf;
 
                 std::memcpy(&delta_len, data + sizeof(HashId), sizeof(uint32_t));
@@ -844,16 +844,14 @@ Object Leveled::PackTable::Load(const HashId& id, const DataType expected) const
                     }
                 } else {
                     assert((tag.Length() - sizeof(HashId) - sizeof(uint32_t)) <= buf_len);
-                    delta_buf = (uint8_t*)(data + sizeof(HashId) + sizeof(uint32_t));
+                    delta_buf = (const uint8_t*)(data + sizeof(HashId) + sizeof(uint32_t));
                 }
 
-                uint32_t out_size = buf_len;
-                uint8_t* res_buf = (uint8_t*)buf;
-                uint8_t* base_buf = (uint8_t*)base.Data();
+                const int out_size = ::gdecode2(
+                    delta_buf, delta_len, (const uint8_t*)base.Data(), base.Size(), (uint8_t*)buf, buf_len
+                );
 
-                ::gdecode(delta_buf, delta_len, base_buf, base.Size(), &res_buf, &out_size);
-
-                if (out_size != buf_len) {
+                if (out_size != ssize_t(buf_len)) {
                     throw std::runtime_error(
                         fmt::format("undeltified size mismatch '{}' and '{}'", out_size, buf_len)
                     );
@@ -881,7 +879,7 @@ Object Leveled::PackTable::Load(const HashId& id, const DataType expected) const
 
         if (base.Type() == DataType::Blob || base.Type() == DataType::Tree) {
             if (parts.size() > 1 || std::get<3>(parts[0]).IsDelta()) {
-                std::lock_guard g(mutex_);
+                absl::MutexLock lock(&mutex_);
 
                 cache_->Put(base_id, base);
             }
