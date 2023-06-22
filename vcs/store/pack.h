@@ -33,6 +33,9 @@ public:
         /// Flush in-core data to storage device after write.
         bool data_sync = true;
 
+        /// Use delta encoding.
+        bool delta_encoding = true;
+
         /// Group objects by type in pack file.
         bool group_by_type = true;
 
@@ -176,6 +179,9 @@ public:
 
         std::span<const std::byte> data_;
         std::span<const std::byte> index_;
+
+        mutable std::mutex mutex_;
+        std::shared_ptr<Datastore::Backend> cache_;
     };
 
 public:

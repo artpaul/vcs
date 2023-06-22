@@ -1,9 +1,12 @@
 #include "pack.h"
 #include "disk.h"
+#include "memory.h"
 
 #include <util/split.h>
 
+#include <contrib/gdelta/gdelta.h>
 #include <contrib/lz4/lz4.h>
+#include <contrib/tlsh/include/tlsh.h>
 #include <contrib/xxhash/xxhash.h>
 
 #include <queue>
@@ -16,209 +19,414 @@ namespace {
  */
 struct TableIsFull { };
 
+struct DataHolder {
+    DataHolder(const Leveled::MemoryTable::Tag& tag1, const Disk::DataTag& tag2, const void* data)
+        : buf_len_(tag1.meta.Size()) {
+        buf_ = std::make_unique_for_overwrite<char[]>(buf_len_);
+
+        if (tag2.IsCompressed()) {
+            const int ret = ::LZ4_decompress_safe(
+                reinterpret_cast<const char*>(data), buf_.get(), tag2.Length(), buf_len_
+            );
+            if (ret != int(buf_len_)) {
+                throw std::runtime_error(fmt::format("cannot decompres content[H] '{}'", ret));
+            }
+        } else {
+            assert(buf_len_ == tag2.Length());
+            //
+            std::memcpy(buf_.get(), data, buf_len_);
+        }
+    }
+
+    const char* Data() const noexcept {
+        return buf_.get();
+    }
+
+    size_t Size() const noexcept {
+        return buf_len_;
+    }
+
+private:
+    std::unique_ptr<char[]> buf_;
+    size_t buf_len_;
+};
+
 class PackWriter {
 public:
-    explicit PackWriter(const Leveled::Options& options)
-        : options_(options) {
-    }
+    explicit PackWriter(const Leveled::Options& options);
 
     std::tuple<std::filesystem::path, std::filesystem::path, HashId, size_t> Write(
         const std::filesystem::path& path,
+        const bool deltify,
         const std::function<void(std::vector<std::pair<HashId, Leveled::MemoryTable::Tag>>& oids)>&
             fill_oids,
         const std::function<std::tuple<const void*, const Disk::DataTag>(const Leveled::MemoryTable::Tag&)>&
             get_content
-    ) {
-        // Populate oids.
-        fill_oids(oids_);
-        // Reorder oids.
-        std::sort(oids_.begin(), oids_.end(), [](const auto& a, const auto& b) {
-            return a.first < b.first;
-        });
-        // Ensure uniqueness of the oids.
-        oids_.erase(
-            std::unique(
-                oids_.begin(), oids_.end(), [](const auto& a, const auto& b) { return a.first == b.first; }
-            ),
-            oids_.end()
-        );
-
-        offsets_.resize(oids_.size());
-
-        const auto& [index_path, data_path] = std::make_pair(path / "index.tmp", path / "pack.tmp");
-
-        // Write data file.
-        const auto [data_hash, data_size] = WriteData(data_path, get_content);
-        // Write index file.
-        WriteIndex(index_path);
-        // Validate written content.
-        CheckPackTable(Leveled::PackTable(index_path, data_path), oids_);
-
-        return std::make_tuple(index_path, data_path, data_hash, data_size);
-    }
+    );
 
 private:
     static void CheckPackTable(
         const Leveled::PackTable& pack,
         const std::vector<std::pair<HashId, Leveled::MemoryTable::Tag>>& oids
-    ) {
-        for (const auto& [id, tag] : oids) {
-            const auto meta = pack.GetMeta(id);
-            // No record with the id.
-            if (!meta) {
-                throw std::runtime_error(fmt::format("cannot locate '{}'", id));
-            }
-            if (meta.Bytes() != tag.meta.Bytes()) {
-                throw std::runtime_error(fmt::format("metadata size mismatch"));
-            }
-            if (std::memcmp(meta.data, tag.meta.data, meta.Bytes()) != 0) {
-                throw std::runtime_error(fmt::format("metadata mismatch"));
-            }
-        }
-    }
+    );
 
     std::vector<uint32_t> GroupObjects(
         const std::vector<std::pair<HashId, Leveled::MemoryTable::Tag>>& oids, bool original
-    ) const {
-        std::vector<uint32_t> index;
-        //
-        index.reserve(oids.size());
-        //
-        for (size_t i = 0, end = oids.size(); i != end; ++i) {
-            index.push_back(i);
-        }
-        if (original) {
-            return index;
-        }
-
-        // Put blos last.
-        const auto blobs = std::partition(index.begin(), index.end(), [&](const uint32_t i) {
-            return oids[i].second.meta.Type() != DataType::Blob;
-        });
-        // Reorder blobs by size.
-        std::sort(blobs, index.end(), [&](const uint32_t l, const uint32_t r) {
-            return std::make_tuple(oids[l].second.meta.Size(), oids[l].first)
-                 > std::make_tuple(oids[r].second.meta.Size(), oids[r].first);
-        });
-
-        // Put commits first.
-        const auto renames = std::partition(index.begin(), blobs, [&](const uint32_t i) {
-            return oids[i].second.meta.Type() == DataType::Commit;
-        });
-        // Put renames after commits.
-        const auto trees = std::partition(renames, blobs, [&](const uint32_t i) {
-            return oids[i].second.meta.Type() == DataType::Renames;
-        });
-
-        // Put trees after renames.
-        const auto rest = std::partition(trees, blobs, [&](const uint32_t i) {
-            return oids[i].second.meta.Type() == DataType::Tree;
-        });
-        // Reorder trees by size.
-        std::sort(trees, rest, [&](const uint32_t l, const uint32_t r) {
-            return std::make_tuple(oids[l].second.meta.Size(), oids[l].first)
-                 > std::make_tuple(oids[r].second.meta.Size(), oids[r].first);
-        });
-
-        return index;
-    }
+    ) const;
 
     std::pair<HashId, size_t> WriteData(
         const std::filesystem::path& path,
+        const bool deltify,
         const std::function<std::tuple<const void*, const Disk::DataTag>(const Leveled::MemoryTable::Tag&)>&
             get_content
-    ) {
-        const std::vector<uint32_t> order = GroupObjects(oids_, !options_.group_by_type);
-        File data_file = File::ForAppend(path);
-        HashId::Builder builder;
-        uint64_t offset = 0;
-
-        // Write pack table (compress).
-        for (const auto i : order) {
-            const auto [buf, tag] = get_content(oids_[i].second);
-
-            {
-                const uint32_t len = tag.Length();
-                // Hash data.
-                builder.Append(&tag, sizeof(tag)).Append(buf, len);
-                // Copy data tag.
-                data_file.Write(&tag, sizeof(tag));
-                // Copy data entry.
-                data_file.Write(buf, len);
-                // Remember offset of the object.
-                offsets_[i] = offset;
-                // Advance pointer.
-                offset += len + sizeof(tag);
-            }
-        }
-        // Ensure data has been written to disk.
-        if (options_.data_sync) {
-            data_file.FlushData();
-        }
-        // Close data file.
-        data_file.Close();
-
-        return std::make_pair(builder.Build(), offset);
-    }
+    );
 
     /**
      * Builds and writes pack index.
      */
-    void WriteIndex(const std::filesystem::path& path) const {
-        std::vector<uint32_t> fanout(256, 0);
-        std::vector<HashId> oids;
-        std::vector<Disk::IndexTag> index;
-        // Allocate memory.
-        index.reserve(oids_.size());
-        oids.reserve(oids_.size());
-        // Fill the index.
-        for (size_t i = 0, end = oids_.size(); i != end; ++i) {
-            const auto& [id, tag] = oids_[i];
-
-            index.emplace_back(tag.meta, offsets_[i]);
-            oids.emplace_back(id);
-        }
-
-        // Build fanout table.
-        // Each cell of the table holds the count of oids so far.
-        for (auto it = oids.begin(), end = oids.end(); it != end;) {
-            const auto next = std::upper_bound(it, end, *it, [](const auto& val, const auto& item) {
-                return val.Data()[0] < item.Data()[0];
-            });
-
-            fanout[it->Data()[0]] = next - oids.begin();
-
-            it = next;
-        }
-        // Fill fanout gaps.
-        for (size_t i = 1, end = fanout.size() - 1; i != end; ++i) {
-            if (fanout[i] == 0) {
-                fanout[i] += fanout[i - 1];
-            }
-        }
-        // Last cell always holds the total number of oids in the index.
-        fanout[fanout.size() - 1] = oids.size();
-
-        File index_file = File::ForAppend(path);
-        // Write fanout table.
-        index_file.Write(fanout.data(), fanout.size() * sizeof(decltype(fanout)::value_type));
-        // Write oids.
-        index_file.Write(oids.data(), oids.size() * sizeof(decltype(oids)::value_type));
-        // Write metadata.
-        index_file.Write(index.data(), index.size() * sizeof(decltype(index)::value_type));
-        // Ensure data has been written to disk.
-        if (options_.data_sync) {
-            index_file.FlushData();
-        }
-        // Close index file.
-        index_file.Close();
-    }
+    void WriteIndex(const std::filesystem::path& path) const;
 
 private:
     Leveled::Options options_;
     std::vector<std::pair<HashId, Leveled::MemoryTable::Tag>> oids_;
     std::vector<uint64_t> offsets_;
 };
+
+PackWriter::PackWriter(const Leveled::Options& options)
+    : options_(options) {
+}
+
+std::tuple<std::filesystem::path, std::filesystem::path, HashId, size_t> PackWriter::Write(
+    const std::filesystem::path& path,
+    const bool deltify,
+    const std::function<void(std::vector<std::pair<HashId, Leveled::MemoryTable::Tag>>& oids)>& fill_oids,
+    const std::function<std::tuple<const void*, const Disk::DataTag>(const Leveled::MemoryTable::Tag&)>&
+        get_content
+) {
+    // Populate oids.
+    fill_oids(oids_);
+    // Reorder oids.
+    std::sort(oids_.begin(), oids_.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+    // Ensure uniqueness of the oids.
+    oids_.erase(
+        std::unique(
+            oids_.begin(), oids_.end(), [](const auto& a, const auto& b) { return a.first == b.first; }
+        ),
+        oids_.end()
+    );
+
+    offsets_.resize(oids_.size());
+
+    const auto& [index_path, data_path] = std::make_pair(path / "index.tmp", path / "pack.tmp");
+
+    // Write data file.
+    const auto [data_hash, data_size] = WriteData(data_path, deltify, get_content);
+    // Write index file.
+    WriteIndex(index_path);
+    // Validate written content.
+    CheckPackTable(Leveled::PackTable(index_path, data_path), oids_);
+
+    return std::make_tuple(index_path, data_path, data_hash, data_size);
+}
+
+void PackWriter::CheckPackTable(
+    const Leveled::PackTable& pack, const std::vector<std::pair<HashId, Leveled::MemoryTable::Tag>>& oids
+) {
+    for (const auto& [id, tag] : oids) {
+        const auto meta = pack.GetMeta(id);
+        // No record with the id.
+        if (!meta) {
+            throw std::runtime_error(fmt::format("cannot locate '{}'", id));
+        }
+        if (meta.Bytes() != tag.meta.Bytes()) {
+            throw std::runtime_error(fmt::format("metadata size mismatch"));
+        }
+        if (std::memcmp(meta.data, tag.meta.data, meta.Bytes()) != 0) {
+            throw std::runtime_error(fmt::format("metadata mismatch"));
+        }
+    }
+}
+
+std::vector<uint32_t> PackWriter::GroupObjects(
+    const std::vector<std::pair<HashId, Leveled::MemoryTable::Tag>>& oids, bool original
+) const {
+    std::vector<uint32_t> index;
+    //
+    index.reserve(oids.size());
+    //
+    for (size_t i = 0, end = oids.size(); i != end; ++i) {
+        index.push_back(i);
+    }
+    if (original) {
+        return index;
+    }
+
+    // Put blos last.
+    const auto blobs = std::partition(index.begin(), index.end(), [&](const uint32_t i) {
+        return oids[i].second.meta.Type() != DataType::Blob;
+    });
+    // Reorder blobs by size.
+    std::sort(blobs, index.end(), [&](const uint32_t l, const uint32_t r) {
+        return std::make_tuple(oids[l].second.meta.Size(), oids[l].first)
+             > std::make_tuple(oids[r].second.meta.Size(), oids[r].first);
+    });
+
+    // Put commits first.
+    const auto renames = std::partition(index.begin(), blobs, [&](const uint32_t i) {
+        return oids[i].second.meta.Type() == DataType::Commit;
+    });
+    // Put renames after commits.
+    const auto trees = std::partition(renames, blobs, [&](const uint32_t i) {
+        return oids[i].second.meta.Type() == DataType::Renames;
+    });
+
+    // Put trees after renames.
+    const auto rest = std::partition(trees, blobs, [&](const uint32_t i) {
+        return oids[i].second.meta.Type() == DataType::Tree;
+    });
+    // Reorder trees by size.
+    std::sort(trees, rest, [&](const uint32_t l, const uint32_t r) {
+        return std::make_tuple(oids[l].second.meta.Size(), oids[l].first)
+             > std::make_tuple(oids[r].second.meta.Size(), oids[r].first);
+    });
+
+    return index;
+}
+
+std::pair<HashId, size_t> PackWriter::WriteData(
+    const std::filesystem::path& path,
+    const bool deltify,
+    const std::function<std::tuple<const void*, const Disk::DataTag>(const Leveled::MemoryTable::Tag&)>&
+        get_content
+) {
+    const std::vector<uint32_t> order = GroupObjects(oids_, !options_.group_by_type);
+    File data_file = File::ForAppend(path);
+    HashId::Builder builder;
+    uint64_t offset = 0;
+
+    std::deque<std::tuple<DataHolder, DataType, size_t, int, std::string>> window;
+
+    // Write pack table (compress).
+    for (const auto i : order) {
+        const auto [buf, tag] = get_content(oids_[i].second);
+
+        const auto try_write_encoded = [&] -> bool {
+            const auto type = oids_[i].second.meta.Type();
+            // Only blobs and trees worth encoding.
+            if (type != DataType::Tree && type != DataType::Blob) {
+                return false;
+            }
+            //
+            if (window.size() && std::get<1>(window.back()) != type) {
+                window.clear();
+            }
+
+            // decompress
+            DataHolder data(oids_[i].second, tag, buf);
+            std::string hash(TLSH_STRING_BUFFER_LEN, 0);
+
+            Tlsh hasher;
+            hasher.update((const unsigned char*)data.Data(), data.Size());
+            hasher.final();
+            hasher.getHash(hash.data(), hash.size());
+
+            if (window.empty()) {
+                window.emplace_back(std::move(data), type, i, 0, std::move(hash));
+                return false;
+            }
+
+            bool success = false;
+            size_t best_len = data.Size();
+            /// Index of base object.
+            size_t best_pos = window.size();
+            uint8_t* delta_buf = nullptr;
+            /// Length of resultant delta.
+            uint32_t delta_len = data.Size();
+            size_t best_score = 100000000ul;
+
+            for (ssize_t ri = window.size() - 1; ri >= 0; --ri) {
+                if (std::get<3>(window[ri]) == 64) {
+                    continue;
+                }
+
+                Tlsh b;
+                b.fromTlshStr(std::get<4>(window[ri]).c_str());
+
+                if (int score = hasher.totalDiff(&b); score < best_score) {
+                    best_score = score;
+                    best_pos = ri;
+                }
+            }
+
+            if (best_pos < window.size()) {
+                uint8_t* tmp_buf = (uint8_t*)std::malloc(data.Size());
+                uint8_t* base_buf = (uint8_t*)std::get<0>(window[best_pos]).Data(); // base
+                uint8_t* new_buf = (uint8_t*)data.Data();
+                uint32_t buf_size = data.Size();
+
+                int ret_len = ::gencode(
+                    new_buf, data.Size(), base_buf, std::get<0>(window[best_pos]).Size(), &tmp_buf,
+                    &buf_size
+                );
+
+                if ((double(ret_len) / double(data.Size())) < 0.85) {
+                    delta_buf = tmp_buf;
+                    delta_len = ret_len;
+                    best_len = ret_len;
+                } else {
+                    best_pos = window.size();
+                    std::free(tmp_buf);
+                }
+            }
+
+            if (best_pos < window.size()) {
+                assert(delta_buf);
+                // fmt::print(
+                //     stderr, "! {}\t{}\t{}  {}    {}  {}\n", i, int(type), data.Size(), best_len,
+                //     best_score, best_pos
+                // );
+
+                auto lz4_size = best_len * options_.compression_penalty;
+                std::unique_ptr<char[]> lz4_buf;
+                const char* src_buf = (const char*)delta_buf;
+                bool is_compressed = false;
+
+                if (lz4_size >= 128) {
+                    lz4_buf = std::make_unique_for_overwrite<char[]>(lz4_size);
+
+                    int lz4_len =
+                        ::LZ4_compress_default((const char*)delta_buf, lz4_buf.get(), best_len, lz4_size);
+                    if (lz4_len == 0) {
+                        lz4_buf.reset();
+                    } else {
+                        is_compressed = true;
+                        // Save compressed.
+                        best_len = lz4_len;
+                        src_buf = lz4_buf.get();
+                    }
+                }
+
+                const Disk::DataTag data_tag(
+                    sizeof(HashId) + sizeof(uint32_t) + best_len, is_compressed, true
+                );
+                const HashId base_id = oids_[std::get<2>(window[best_pos])].first;
+                // Hash data.
+                builder.Append(&data_tag, sizeof(data_tag))
+                    .Append(base_id.Data(), base_id.Size())
+                    .Append(&delta_len, sizeof(delta_len))
+                    .Append(src_buf, best_len);
+                // Copy data tag.
+                data_file.Write(&data_tag, sizeof(data_tag));
+                // Copy data entry.
+                data_file.Write(base_id.Data(), base_id.Size());
+                // Uncompressed delta length.
+                data_file.Write(&delta_len, sizeof(delta_len));
+                // Resultant buffer.
+                data_file.Write(src_buf, best_len);
+                // Remember offset of the object.
+                offsets_[i] = offset;
+                // Advance pointer.
+                offset += sizeof(data_tag) + data_tag.Length();
+                success = true;
+            }
+
+            std::free(delta_buf);
+
+            window.emplace_back(
+                std::move(data), type, i, success ? 1 + std::get<3>(window[best_pos]) : 0, std::move(hash)
+            );
+
+            if (window.size() > 256) {
+                window.pop_front();
+            }
+
+            return success;
+        };
+
+        const auto write_raw = [&] {
+            const uint32_t len = tag.Length();
+            // Hash data.
+            builder.Append(&tag, sizeof(tag)).Append(buf, len);
+            // Copy data tag.
+            data_file.Write(&tag, sizeof(tag));
+            // Copy data entry.
+            data_file.Write(buf, len);
+            // Remember offset of the object.
+            offsets_[i] = offset;
+            // Advance pointer.
+            offset += len + sizeof(tag);
+        };
+
+        // Try to write a record delta-encoded.
+        if (deltify && oids_[i].second.meta.Size() >= 64) {
+            if (try_write_encoded()) {
+                continue;
+            }
+        }
+        // Write as is.
+        write_raw();
+    }
+    // Ensure data has been written to disk.
+    if (options_.data_sync) {
+        data_file.FlushData();
+    }
+    // Close data file.
+    data_file.Close();
+
+    return std::make_pair(builder.Build(), offset);
+}
+
+void PackWriter::WriteIndex(const std::filesystem::path& path) const {
+    std::vector<uint32_t> fanout(256, 0);
+    std::vector<HashId> oids;
+    std::vector<Disk::IndexTag> index;
+    // Allocate memory.
+    index.reserve(oids_.size());
+    oids.reserve(oids_.size());
+    // Fill the index.
+    for (size_t i = 0, end = oids_.size(); i != end; ++i) {
+        const auto& [id, tag] = oids_[i];
+
+        index.emplace_back(tag.meta, offsets_[i]);
+        oids.emplace_back(id);
+    }
+
+    // Build fanout table.
+    // Each cell of the table holds the count of oids so far.
+    for (auto it = oids.begin(), end = oids.end(); it != end;) {
+        const auto next = std::upper_bound(it, end, *it, [](const auto& val, const auto& item) {
+            return val.Data()[0] < item.Data()[0];
+        });
+
+        fanout[it->Data()[0]] = next - oids.begin();
+
+        it = next;
+    }
+    // Fill fanout gaps.
+    for (size_t i = 1, end = fanout.size() - 1; i != end; ++i) {
+        if (fanout[i] == 0) {
+            fanout[i] += fanout[i - 1];
+        }
+    }
+    // Last cell always holds the total number of oids in the index.
+    fanout[fanout.size() - 1] = oids.size();
+
+    File index_file = File::ForAppend(path);
+    // Write fanout table.
+    index_file.Write(fanout.data(), fanout.size() * sizeof(decltype(fanout)::value_type));
+    // Write oids.
+    index_file.Write(oids.data(), oids.size() * sizeof(decltype(oids)::value_type));
+    // Write metadata.
+    index_file.Write(index.data(), index.size() * sizeof(decltype(index)::value_type));
+    // Ensure data has been written to disk.
+    if (options_.data_sync) {
+        index_file.FlushData();
+    }
+    // Close index file.
+    index_file.Close();
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 std::tuple<std::span<const uint32_t, 256>, std::span<const HashId>, std::span<const Disk::IndexTag>>
 MakeIndexLayout(const std::span<const std::byte> buf) {
@@ -515,6 +723,8 @@ Leveled::PackTable::PackTable(const std::filesystem::path& index, const std::fil
     pack_file_.second = File::ForRead(pack);
     pack_file_.first = std::make_unique<FileMap>(pack_file_.second);
     data_ = {(const std::byte*)pack_file_.first->Map(), pack_file_.second.Size()};
+
+    cache_ = Store::MemoryCache::Make();
 }
 
 void Leveled::PackTable::Enumerate(const std::function<bool(const HashId&, const DataHeader)>& cb) const {
@@ -547,21 +757,32 @@ DataHeader Leveled::PackTable::GetMeta(const HashId& id) const {
 }
 
 Object Leveled::PackTable::Load(const HashId& id, const DataType expected) const {
-    const auto entry = FindIndexEntry(id, index_);
-    // No object.
-    if (!entry) {
-        return Object();
-    }
+    //
+    Object base;
+    //
+    std::vector<std::tuple<const Disk::IndexTag*, const std::byte*, HashId, Disk::DataTag>> parts;
 
-    const DataHeader hdr = entry->Meta();
-    // Type mismatch.
-    if (expected != DataType::None && hdr.Type() != expected && hdr.Type() != DataType::Index) {
-        return Object();
-    }
-    // Load objects's content.
-    return Object::Load(hdr, [&](std::byte* buf, size_t buf_len) {
-        const size_t offset = entry->Offset();
+    // Collect parts.
+    for (HashId base_id = id; true;) {
+        {
+            std::lock_guard g(mutex_);
+
+            if (auto obj = cache_->Load(base_id, expected)) {
+                base = obj;
+                break;
+            }
+        }
+
+        const auto entry = FindIndexEntry(base_id, index_);
+        // No object.
+        if (!entry) {
+            return Object();
+        }
+
+        const auto offset = entry->Offset();
+        const auto data = data_.data() + offset + sizeof(Disk::DataTag);
         Disk::DataTag tag;
+
         // Load content's size.
         if (offset + sizeof(tag) > data_.size()) {
             throw std::runtime_error("cannot load length (overflow)");
@@ -572,26 +793,102 @@ Object Leveled::PackTable::Load(const HashId& id, const DataType expected) const
         if (offset + sizeof(tag) + tag.Length() > data_.size()) {
             throw std::runtime_error("cannot load content (overflow)");
         }
-        if (tag.Length() == 0) {
-            return;
-        }
-        if (tag.IsCompressed()) {
-            const int ret = ::LZ4_decompress_safe(
-                reinterpret_cast<const char*>(data_.data()) + (offset + sizeof(tag)), (char*)buf,
-                tag.Length(), buf_len
-            );
 
-            if (ret != int(buf_len)) {
-                throw std::runtime_error(fmt::format("cannot decompres content '{}'", ret));
-            }
-        } else if (tag.Length() == buf_len) {
-            std::memcpy(buf, data_.data() + offset + sizeof(tag), buf_len);
+        parts.emplace_back(entry, data, base_id, tag);
+
+        if (tag.IsDelta()) {
+            base_id = HashId::FromBytes(data, sizeof(HashId));
         } else {
-            throw std::runtime_error(
-                fmt::format("uncompressed size mismatch '{}' and '{}'", tag.Length(), buf_len)
-            );
+            break;
         }
-    });
+    }
+
+    if (parts.empty()) {
+        // Type mismatch.
+        if (expected != DataType::None && base.Type() != expected && base.Type() != DataType::Index) {
+            return Object();
+        }
+        return base;
+    } else {
+        const DataHeader hdr = std::get<0>(parts[0])->Meta();
+        // Type mismatch.
+        if (expected != DataType::None && hdr.Type() != expected && hdr.Type() != DataType::Index) {
+            return Object();
+        }
+    }
+
+    for (ssize_t i = parts.size() - 1; i >= 0; --i) {
+        const auto& [entry, data, base_id, tag] = parts[i];
+
+        // Load objects's content.
+        if (tag.IsDelta()) {
+            base = Object::Load(std::get<0>(parts[i])->Meta(), [&](std::byte* buf, size_t buf_len) {
+                uint32_t delta_len = 0;
+                uint8_t* delta_buf = nullptr;
+                std::unique_ptr<char[]> tmp_buf;
+
+                std::memcpy(&delta_len, data + sizeof(HashId), sizeof(uint32_t));
+
+                if (tag.IsCompressed()) {
+                    tmp_buf = std::make_unique_for_overwrite<char[]>(delta_len);
+
+                    const int ret = ::LZ4_decompress_safe(
+                        reinterpret_cast<const char*>(data + sizeof(HashId) + sizeof(uint32_t)),
+                        tmp_buf.get(), tag.Length() - sizeof(HashId) - sizeof(uint32_t), delta_len
+                    );
+
+                    if (ret < 0) {
+                        throw std::runtime_error(fmt::format("cannot decompres delta '{}'", ret));
+                    } else {
+                        delta_buf = (uint8_t*)(tmp_buf.get());
+                    }
+                } else {
+                    assert((tag.Length() - sizeof(HashId) - sizeof(uint32_t)) <= buf_len);
+                    delta_buf = (uint8_t*)(data + sizeof(HashId) + sizeof(uint32_t));
+                }
+
+                uint32_t out_size = buf_len;
+                uint8_t* res_buf = (uint8_t*)buf;
+                uint8_t* base_buf = (uint8_t*)base.Data();
+
+                ::gdecode(delta_buf, delta_len, base_buf, base.Size(), &res_buf, &out_size);
+
+                if (out_size != buf_len) {
+                    throw std::runtime_error(
+                        fmt::format("undeltified size mismatch '{}' and '{}'", out_size, buf_len)
+                    );
+                }
+            });
+        } else {
+            base = Object::Load(std::get<0>(parts[i])->Meta(), [&](std::byte* buf, size_t buf_len) {
+                if (tag.IsCompressed()) {
+                    const int ret = ::LZ4_decompress_safe(
+                        reinterpret_cast<const char*>(data), (char*)buf, tag.Length(), buf_len
+                    );
+
+                    if (ret != int(buf_len)) {
+                        throw std::runtime_error(fmt::format("cannot decompres content[P] '{}'", ret));
+                    }
+                } else if (tag.Length() == buf_len) {
+                    std::memcpy(buf, data, buf_len);
+                } else {
+                    throw std::runtime_error(
+                        fmt::format("uncompressed size mismatch '{}' and '{}'", tag.Length(), buf_len)
+                    );
+                }
+            });
+        }
+
+        if (base.Type() == DataType::Blob || base.Type() == DataType::Tree) {
+            if (parts.size() > 1 || std::get<3>(parts[0]).IsDelta()) {
+                std::lock_guard g(mutex_);
+
+                cache_->Put(base_id, base);
+            }
+        }
+    }
+
+    return base;
 }
 
 void Leveled::PackTable::Put(const HashId&, const DataType, const std::string_view) {
@@ -604,7 +901,7 @@ std::shared_ptr<Leveled::PackTable> Leveled::PackTable::MergeMemtables(
     const Options& options
 ) {
     const auto& [index_path, data_path, data_hash, _] = PackWriter(options).Write(
-        path,
+        path, options.delta_encoding,
         // Fill oids.
         [&](std::vector<std::pair<HashId, Leveled::MemoryTable::Tag>>& oids) {
             for (size_t i = 0, end = snapshots.size(); i < end; ++i) {
@@ -640,7 +937,7 @@ std::pair<std::shared_ptr<Leveled::PackTable>, size_t> Leveled::PackTable::Merge
     const Options& options
 ) {
     const auto& [index_path, data_path, data_hash, data_size] = PackWriter(options).Write(
-        path,
+        path, false,
         // Fill oids.
         [&](std::vector<std::pair<HashId, Leveled::MemoryTable::Tag>>& oids) {
             for (size_t t = 0; t < tables.size(); ++t) {

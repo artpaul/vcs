@@ -40,9 +40,11 @@ target_include_directories(libvcs3 SYSTEM PUBLIC
 target_link_libraries(libvcs3 PUBLIC
     contrib-flatbuffers
     contrib-fmt
+    contrib-gdelta
     contrib-libgit2
     contrib-lz4
     contrib-sha
+    contrib-tlsh
     contrib-xxhash
     vcs-util
 )
