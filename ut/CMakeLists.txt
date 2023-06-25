@@ -19,6 +19,7 @@ target_sources(libvcs3-ut PRIVATE
     "ut_config.cpp"
     "ut_data.cpp"
     "ut_hashid.cpp"
+    "ut_ignore.cpp"
     "ut_object.cpp"
     "ut_path.cpp"
     "ut_revparse.cpp"

@@ -4,4 +4,5 @@ target_sources(vcs-util PRIVATE
     "file.cpp"
     "split.cpp"
     "tty.cpp"
+    "wildmatch.cpp"
 )

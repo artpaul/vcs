@@ -60,6 +60,7 @@ target_sources(libvcs3 PRIVATE
     "changes/stage.cpp"
     "changes/validate.cpp"
     "common/config.cpp"
+    "common/ignore.cpp"
     "common/revparse.cpp"
     "git/converter.cpp"
     "object/change.cpp"
