@@ -18,8 +18,6 @@ struct PathStatus {
     enum Status {
         /// Path is untracked.
         Untracked = 0,
-        /// Path has been added.
-        Added,
         /// Path is deleted.
         Deleted,
         /// Path is ignored.
@@ -42,6 +40,11 @@ struct PathStatus {
         return *this;
     }
 
+    PathStatus& SetEntry(const std::optional<PathEntry>& value) noexcept {
+        entry = value;
+        return *this;
+    }
+
     PathStatus& SetPath(std::string value) noexcept {
         path = std::move(value);
         return *this;
@@ -60,7 +63,7 @@ struct PathStatus {
 
 struct StatusOptions {
     /// Emit ignored items.
-    Expansion ignored = Expansion::None;
+    bool ignored = false;
     /// Emit modifications of tracked items.
     bool tracked = true;
     /// Emit untracked items.
@@ -68,7 +71,7 @@ struct StatusOptions {
     /// Paths to include.
     PathFilter include;
 
-    StatusOptions& SetIgnored(Expansion value) noexcept {
+    StatusOptions& SetIgnored(bool value) noexcept {
         ignored = value;
         return *this;
     }

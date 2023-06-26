@@ -15,6 +15,10 @@ namespace {
 struct Options {
     /// Paths to include in status.
     std::vector<std::string> paths;
+    /// Show ignored files.
+    bool ignored = false;
+    /// Untracked options.
+    Expansion untracked = Expansion::Normal;
 };
 
 void BranchInfo(const Options&, const Workspace& repo) {
@@ -34,23 +38,37 @@ void BranchInfo(const Options&, const Workspace& repo) {
 
 void ChangesInfo(const Options& options, const Workspace& repo) {
     std::vector<PathStatus> tracked;
+    std::vector<PathStatus> ignored;
     std::vector<PathStatus> untracked;
 
-    repo.Status(StatusOptions().SetInclude(PathFilter(options.paths)), [&](const PathStatus& status) {
-        if (status.status == PathStatus::Deleted || status.status == PathStatus::Modified) {
-            tracked.push_back(status);
+    repo.Status(
+        StatusOptions()
+            .SetInclude(PathFilter(options.paths))
+            .SetIgnored(options.ignored)
+            .SetUntracked(options.untracked),
+        [&](const PathStatus& status) {
+            switch (status.status) {
+                case PathStatus::Deleted:
+                case PathStatus::Modified:
+                    tracked.push_back(status);
+                    break;
+                case PathStatus::Ignored:
+                    ignored.push_back(status);
+                    break;
+                case PathStatus::Untracked:
+                    untracked.push_back(status);
+                    break;
+            }
         }
-        if (status.status == PathStatus::Untracked) {
-            untracked.push_back(status);
-        }
-    });
+    );
 
-    const auto process_paths = [&](std::vector<PathStatus>& paths) {
+    const auto process_paths = [](std::vector<PathStatus>& paths) {
         // Sort paths.
         std::sort(paths.begin(), paths.end(), [](const auto& a, const auto& b) { return a.path < b.path; });
     };
 
     process_paths(tracked);
+    process_paths(ignored);
     process_paths(untracked);
 
     if (tracked.size()) {
@@ -95,7 +113,16 @@ void ChangesInfo(const Options& options, const Workspace& repo) {
         }
     }
 
-    if (tracked.size() || untracked.size()) {
+    if (ignored.size()) {
+        fmt::print("\nIgnored files:\n");
+        // TODO: how to commit ignored files.
+
+        for (const auto& status : ignored) {
+            fmt::print("\t{}{}\n", status.path, (status.type == PathType::Directory ? "/" : ""));
+        }
+    }
+
+    if (tracked.size() || ignored.size() || untracked.size()) {
         fmt::print("\n");
     }
 }
@@ -117,6 +144,9 @@ int ExecuteStatus(int argc, char* argv[], const std::function<Workspace&()>& cb)
             "",
             {
                 {"h,help", "print help"},
+                {"u,untracked-files", "show untracked files, optional modes: all, normal, no",
+                 cxxopts::value<std::string>()->implicit_value("all"), "mode"},
+                {"ignored", "show ignored files", cxxopts::value(options.ignored)},
                 {"paths", "paths to status", cxxopts::value<std::vector<std::string>>()},
             }
         );
@@ -128,6 +158,21 @@ int ExecuteStatus(int argc, char* argv[], const std::function<Workspace&()>& cb)
         if (opts.count("help")) {
             fmt::print("{}\n", spec.help());
             return 0;
+        }
+        if (opts.has("u")) {
+            const auto arg = opts["u"].as<std::string>();
+
+            if (arg == "all") {
+                options.untracked = Expansion::All;
+            } else if (arg == "no") {
+                options.ignored = false;
+                options.untracked = Expansion::None;
+            } else if (arg == "normal") {
+                options.untracked = Expansion::Normal;
+            } else {
+                fmt::print(stderr, "error: unknown untracked mode '{}'\n", arg);
+                return 1;
+            }
         }
         if (opts.has("paths")) {
             const auto& paths = opts["paths"].as<std::vector<std::string>>();

@@ -1,6 +1,7 @@
 #include "worktree.h"
 
 #include <vcs/changes/changelist.h>
+#include <vcs/common/ignore.h>
 #include <vcs/object/serialize.h>
 #include <vcs/store/memory.h>
 
@@ -19,14 +20,16 @@ class StatusState {
 public:
     StatusState() = default;
 
-    StatusState(std::string path)
-        : path_(std::move(path)) {
+    StatusState(std::string path, PathStatus::Status status)
+        : path_(std::move(path))
+        , status_(status) {
     }
 
-    StatusState(std::string path, const std::vector<std::pair<std::string, PathEntry>>& entries)
+    StatusState(std::string path, std::vector<std::pair<std::string, PathEntry>> entries)
         : path_(path) {
-        for (const auto& e : entries) {
-            entries_.emplace(e.first, std::make_pair(e.second, false));
+        for (auto& e : entries) {
+            // Entries are sorted in general so it can be inserted with hint.
+            entries_.emplace_hint(entries_.end(), std::move(e.first), std::make_pair(e.second, false));
         }
     }
 
@@ -52,6 +55,10 @@ public:
         return JoinPath(path_, name);
     }
 
+    std::optional<PathStatus::Status> Status() const noexcept {
+        return status_;
+    }
+
 private:
     static std::string JoinPath(std::string path, const std::string_view name) {
         if (path.empty()) {
@@ -66,6 +73,7 @@ private:
 private:
     std::string path_;
     std::map<std::string, std::pair<PathEntry, bool>, std::less<>> entries_;
+    std::optional<PathStatus::Status> status_;
 };
 
 } // namespace
@@ -310,9 +318,21 @@ void WorkingTree::Status(const StatusOptions& options, const StageArea& stage, c
     const {
     auto di = std::filesystem::recursive_directory_iterator(path_);
 
-    std::stack<StatusState> state;
+    std::vector<std::tuple<IgnoreRules, std::filesystem::path, size_t>> ignores;
+    std::vector<StatusState> state;
 
-    state.emplace(std::string(), stage.ListTree(std::string()));
+    const auto is_ignored = [&](const std::filesystem::path& path, const bool is_directory) {
+        for (auto ri = ignores.rbegin(); ri != ignores.rend(); ++ri) {
+            const auto value =
+                std::get<0>(*ri).Match(path.lexically_relative(std::get<1>(*ri)).string(), is_directory);
+
+            if (value) {
+                return *value;
+            }
+        }
+
+        return false;
+    };
 
     const auto is_not_match = [&](const auto& path) {
         return !options.include.Match(path);
@@ -325,7 +345,7 @@ void WorkingTree::Status(const StatusOptions& options, const StageArea& stage, c
     const auto emit_deleted = [&](const size_t depth) {
         while (state.size() > depth) {
             if (options.tracked) {
-                state.top().EnumerateDeleted([&](const std::string& path, const PathEntry& entry) {
+                state.back().EnumerateDeleted([&](const std::string& path, const PathEntry& entry) {
                     if (is_not_match(path)) {
                         return;
                     }
@@ -337,18 +357,41 @@ void WorkingTree::Status(const StatusOptions& options, const StageArea& stage, c
                 });
             }
 
-            state.pop();
+            state.pop_back();
+        }
+
+        while (ignores.size()) {
+            if (std::get<2>(ignores.back()) >= depth) {
+                ignores.pop_back();
+            } else {
+                break;
+            }
         }
     };
 
-    for (const auto& entry : di) {
-        const auto& filename = entry.path().filename().string();
-        const auto& path = entry.path().lexically_relative(path_).string();
+    const auto try_load_ignore = [&](const std::filesystem::path& base, const size_t depth) {
+        IgnoreRules rules;
 
-        //
+        if (options.untracked == Expansion::None) {
+            return;
+        }
+
+        if (rules.Load(base / ".gitignore")) {
+            ignores.emplace_back(std::move(rules), base, depth);
+        }
+    };
+
+    state.emplace_back(std::string(), stage.ListTree(std::string()));
+    try_load_ignore(path_, 0);
+
+    for (const auto& entry : di) {
+        const auto filename = entry.path().filename().string();
+        const auto path = entry.path().lexically_relative(path_).string();
+
+        // Flush leaved directories.
         emit_deleted(di.depth() + 1);
 
-        //
+        // Skip system entry.
         if (di.depth() == 0 && filename == ".vcs") {
             if (entry.is_directory()) {
                 di.disable_recursion_pending();
@@ -363,34 +406,78 @@ void WorkingTree::Status(const StatusOptions& options, const StageArea& stage, c
                 continue;
             }
 
-            if (const auto ei = state.top().Find(filename)) {
+            if (const auto ei = state.back().Find(filename)) {
                 if (IsDirectory(ei->type)) {
                     // Emplace entries on entering a directory.
-                    state.emplace(path, stage.ListTree(path));
+                    state.emplace_back(path, stage.ListTree(path));
                 } else {
                     // type change
                 }
+            } else if (options.untracked == Expansion::None) {
+                di.disable_recursion_pending();
             } else {
+                const bool ignored =
+                    state.back().Status() == PathStatus::Ignored || is_ignored(entry.path(), true);
                 // Emit untracked status.
-                if (options.untracked != Expansion::None) {
+                if (ignored) {
+                    if (options.ignored) {
+                        cb(PathStatus()
+                               .SetPath(path)
+                               .SetStatus(PathStatus::Ignored)
+                               .SetType(PathType::Directory));
+                    }
+                } else {
                     cb(PathStatus()
                            .SetPath(path)
-                           .SetStatus(PathStatus::Untracked)
+                           .SetStatus(state.back().Status().value_or(PathStatus::Untracked))
                            .SetType(PathType::Directory));
                 }
                 // Skip subtree if there is no need to expand it.
                 if (options.untracked != Expansion::All) {
                     di.disable_recursion_pending();
+                } else if (ignored) {
+                    if (options.ignored) {
+                        state.emplace_back(path, PathStatus::Ignored);
+                    } else {
+                        di.disable_recursion_pending();
+                    }
+                } else {
+                    state.emplace_back(path, PathStatus::Untracked);
                 }
+            }
+
+            // Loading ignore rules even for untracked directories.
+            if (di.recursion_pending()) {
+                try_load_ignore(entry.path(), di.depth() + 1);
             }
         } else if (entry.is_regular_file() || entry.is_symlink()) {
             const auto path_type = entry.is_regular_file() ? PathType::File : PathType::Symlink;
+
+            const auto emit_untracked = [&](std::string path, std::optional<PathEntry> pe) {
+                assert(options.untracked != Expansion::None);
+
+                if (state.back().Status() == PathStatus::Ignored || is_ignored(entry.path(), false)) {
+                    if (options.ignored) {
+                        cb(PathStatus()
+                               .SetEntry(pe)
+                               .SetPath(std::move(path))
+                               .SetStatus(PathStatus::Ignored)
+                               .SetType(path_type));
+                    }
+                } else {
+                    cb(PathStatus()
+                           .SetEntry(pe)
+                           .SetPath(std::move(path))
+                           .SetStatus(PathStatus::Untracked)
+                           .SetType(path_type));
+                }
+            };
 
             if (is_not_match(path)) {
                 continue;
             }
 
-            if (const auto ei = state.top().Find(filename)) {
+            if (const auto ei = state.back().Find(filename)) {
                 if (IsDirectory(ei->type)) {
                     // Previous directory entry.
                     if (options.tracked) {
@@ -402,11 +489,7 @@ void WorkingTree::Status(const StatusOptions& options, const StageArea& stage, c
                     }
                     // Current file entry.
                     if (options.untracked != Expansion::None) {
-                        cb(PathStatus()
-                               .SetEntry(*ei)
-                               .SetPath(path)
-                               .SetStatus(PathStatus::Untracked)
-                               .SetType(path_type));
+                        emit_untracked(path, *ei);
                     }
                 } else if (options.tracked) {
                     if (const Modifications changes = CompareBlobEntry(*ei, entry, odb_)) {
@@ -418,7 +501,7 @@ void WorkingTree::Status(const StatusOptions& options, const StageArea& stage, c
                     }
                 }
             } else if (options.untracked != Expansion::None) {
-                cb(PathStatus().SetPath(path).SetStatus(PathStatus::Untracked).SetType(path_type));
+                emit_untracked(path, {});
             }
         }
     }

@@ -5,6 +5,8 @@
 
 #include <contrib/fmt/fmt/format.h>
 
+#include <fstream>
+
 namespace Vcs {
 
 static std::string_view StripRight(const std::string_view str) {
@@ -90,8 +92,6 @@ static bool ParseRule(std::string_view line, Rule& rule) {
         }
     }
 
-    // TODO: context
-
     return true;
 }
 
@@ -99,7 +99,7 @@ IgnoreRules::IgnoreRules(const std::string_view data) {
     Load(data);
 }
 
-void IgnoreRules::Load(const std::string_view data) {
+bool IgnoreRules::Load(const std::string_view data) {
     const auto lines = SplitString(data, '\n');
 
     for (const auto line : lines) {
@@ -109,15 +109,36 @@ void IgnoreRules::Load(const std::string_view data) {
             rules_.push_back(std::move(rule));
         }
     }
+
+    return rules_.size();
 }
 
-bool IgnoreRules::Match(const std::string_view path, const bool is_directory) const {
-    if (path.empty()) {
+bool IgnoreRules::Load(const std::filesystem::path& path) {
+    std::fstream input(path, std::ios_base::in);
+    std::string line;
+
+    if (!input.is_open()) {
         return false;
     }
 
+    while (std::getline(input, line)) {
+        Rule rule;
+
+        if (ParseRule(StripRight(line), rule)) {
+            rules_.push_back(std::move(rule));
+        }
+    }
+
+    return rules_.size();
+}
+
+std::optional<bool> IgnoreRules::Match(const std::string_view path, const bool is_directory) const {
+    if (path.empty() || rules_.empty()) {
+        return {};
+    }
+
     std::string_view filename;
-    bool matched = false;
+    std::optional<bool> matched;
 
     // Extract filename.
     if (auto pos = path.rfind('/'); pos == std::string_view::npos) {

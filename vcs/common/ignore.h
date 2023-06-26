@@ -1,5 +1,7 @@
 #pragma once
 
+#include <filesystem>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -45,7 +47,12 @@ public:
     /**
      * Loads ignore rules from the string.
      */
-    void Load(const std::string_view data);
+    bool Load(const std::string_view data);
+
+    /**
+     * Loads ignore rules from a file.
+     */
+    bool Load(const std::filesystem::path& path);
 
     /**
      * @brief
@@ -55,7 +62,7 @@ public:
      * @return true if path should be ignored
      * @return false otherwise
      */
-    bool Match(const std::string_view path, const bool is_directory) const;
+    std::optional<bool> Match(const std::string_view path, const bool is_directory) const;
 
 private:
     std::vector<Rule> rules_;

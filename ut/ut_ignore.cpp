@@ -29,10 +29,10 @@ build/tmp
     EXPECT_EQ(rules[0].pattern, "out");
     EXPECT_EQ(rules[0].flags, Rule::kFullPath | Rule::kDirectory);
 
-    EXPECT_TRUE(rules.Match("a/b/c/CMakeSettings.json", false));
-    EXPECT_TRUE(rules.Match("build/tmp", false));
-    EXPECT_TRUE(rules.Match("build/tmp", true));
-    EXPECT_TRUE(rules.Match("out", true));
+    EXPECT_TRUE(*rules.Match("a/b/c/CMakeSettings.json", false));
+    EXPECT_TRUE(*rules.Match("build/tmp", false));
+    EXPECT_TRUE(*rules.Match("build/tmp", true));
+    EXPECT_TRUE(*rules.Match("out", true));
 
     EXPECT_FALSE(rules.Match("out", false));
     EXPECT_FALSE(rules.Match("tmp", false));
@@ -55,10 +55,10 @@ foo/*
     EXPECT_EQ(rules[1].pattern, "foo/*");
     EXPECT_EQ(rules[1].flags, Rule::kHasWildcard | Rule::kFullPath);
 
-    EXPECT_TRUE(rules.Match("a/b/c.pyc", false));
-    EXPECT_TRUE(rules.Match("a/b/c.pyc", true));
-    EXPECT_TRUE(rules.Match("foo/test.json", false));
-    EXPECT_TRUE(rules.Match("foo/bar", true));
+    EXPECT_TRUE(*rules.Match("a/b/c.pyc", false));
+    EXPECT_TRUE(*rules.Match("a/b/c.pyc", true));
+    EXPECT_TRUE(*rules.Match("foo/test.json", false));
+    EXPECT_TRUE(*rules.Match("foo/bar", true));
 
     // EXPECT_FALSE(rules.Match("foo/bar/hello.c", false));
 }
@@ -78,13 +78,13 @@ TEST(IgnoreRules, Negate) {
     EXPECT_EQ(rules[0].flags, Rule::kFullPath | Rule::kHasWildcard);
     EXPECT_EQ(rules[3].flags, Rule::kFullPath | Rule::kDirectory | Rule::kNegative);
 
-    EXPECT_TRUE(rules.Match("foo/bar", false));
-    EXPECT_TRUE(rules.Match("foo", false));
-    EXPECT_TRUE(rules.Match("bar", false));
-    EXPECT_TRUE(rules.Match("foo/abc", false));
+    EXPECT_TRUE(*rules.Match("foo/bar", false));
+    EXPECT_TRUE(*rules.Match("foo", false));
+    EXPECT_TRUE(*rules.Match("bar", false));
+    EXPECT_TRUE(*rules.Match("foo/abc", false));
 
-    EXPECT_FALSE(rules.Match("foo/bar", true));
-    EXPECT_FALSE(rules.Match("foo", true));
+    EXPECT_FALSE(*rules.Match("foo", true));
+    EXPECT_FALSE(*rules.Match("foo/bar", true));
 }
 
 TEST(IgnoreRules, StarStar) {
@@ -96,6 +96,6 @@ a/**/b
 
     ASSERT_EQ(rules.Count(), 1);
 
-    EXPECT_TRUE(rules.Match("a/b", true));
-    EXPECT_TRUE(rules.Match("a/x/b", true));
+    EXPECT_TRUE(*rules.Match("a/b", true));
+    EXPECT_TRUE(*rules.Match("a/x/b", true));
 }
