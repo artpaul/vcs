@@ -1,6 +1,7 @@
 #pragma once
 
-#include <vcs/changes/path.h>
+#include "path.h"
+
 #include <vcs/object/path.h>
 
 #include <functional>

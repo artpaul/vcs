@@ -2,7 +2,7 @@
 
 #include "color.h"
 
-#include <cmd/local/status.h>
+#include <vcs/changes/status.h>
 #include <vcs/object/change.h>
 
 namespace Vcs {

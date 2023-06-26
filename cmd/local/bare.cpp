@@ -3,6 +3,7 @@
 #include "worktree.h"
 
 #include <vcs/changes/revwalk.h>
+#include <vcs/changes/stage.h>
 #include <vcs/common/config.h>
 #include <vcs/store/loose.h>
 #include <vcs/store/memory.h>

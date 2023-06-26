@@ -1,7 +1,8 @@
 #pragma once
 
 #include "bare.h"
-#include "status.h"
+
+#include <vcs/changes/status.h>
 
 #include <filesystem>
 #include <functional>

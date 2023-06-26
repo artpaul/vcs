@@ -1,8 +1,7 @@
 #pragma once
 
-#include "status.h"
-
 #include <vcs/changes/stage.h>
+#include <vcs/changes/status.h>
 #include <vcs/object/store.h>
 
 #include <filesystem>
