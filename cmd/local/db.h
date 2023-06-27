@@ -75,9 +75,39 @@ private:
 
 class Database {
 public:
+    class Transaction {
+    public:
+        virtual ~Transaction() noexcept = default;
+
+        /**
+         * Commit changes.
+         */
+        virtual Status Commit() noexcept = 0;
+
+        /**
+         * Rollback changes.
+         */
+        virtual void Rollback() noexcept = 0;
+
+    public:
+        /**
+         * Get value by key.
+         */
+        virtual std::expected<std::string, Status> Get(const std::string_view key) const = 0;
+
+        /**
+         * Put key-value pair.
+         */
+        virtual Status Put(const std::string_view key, const std::string_view value) = 0;
+    };
+
+public:
     Database(const std::filesystem::path& path, const Options& options);
     ~Database();
 
+    std::expected<std::unique_ptr<Transaction>, Status> StartTransaction(bool read_only);
+
+public:
     Status Delete(const std::string_view key);
 
     Status Enumerate(const std::function<bool(const std::string_view, const std::string_view)>& cb) const;
@@ -85,6 +115,14 @@ public:
     std::expected<std::string, Status> Get(const std::string_view key) const;
 
     Status Put(const std::string_view key, const std::string_view value);
+
+    /**
+     * Overwrite the database with the list of items.
+     *
+     * @param items list of key-value pairs sorted by key.
+     * @return Status
+     */
+    Status Reset(const std::vector<std::pair<std::string, std::string>>& items);
 
 private:
     class Impl;
