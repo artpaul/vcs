@@ -8,12 +8,21 @@
 
 namespace Vcs {
 
+class TreeIndex;
+
 /**
  * Actions with working directory.
  */
 class WorkingTree {
 public:
-    WorkingTree(const std::filesystem::path& path, const Datastore odb, const std::function<HashId()> cb);
+    WorkingTree(
+        const std::filesystem::path& path,
+        const std::filesystem::path& state,
+        const Datastore odb,
+        const std::function<HashId()> cb
+    );
+
+    ~WorkingTree();
 
     /** Root path of the tree. */
     const std::filesystem::path& GetPath() const;
@@ -51,6 +60,8 @@ private:
     const Datastore odb_;
     ///
     std::function<HashId()> get_tree_;
+
+    std::unique_ptr<TreeIndex> index_;
 };
 
 } // namespace Vcs

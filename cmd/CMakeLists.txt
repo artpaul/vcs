@@ -15,6 +15,7 @@ target_sources(vcs-local PRIVATE
     "local/bare.cpp"
     "local/db.cpp"
     "local/fetch.cpp"
+    "local/index.cpp"
     "local/workspace.cpp"
     "local/worktree.cpp"
     "ui/color.cpp"

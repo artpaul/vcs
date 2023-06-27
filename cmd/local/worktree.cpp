@@ -1,4 +1,5 @@
 #include "worktree.h"
+#include "index.h"
 
 #include <vcs/changes/changelist.h>
 #include <vcs/common/ignore.h>
@@ -76,15 +77,98 @@ private:
     std::optional<PathStatus::Status> status_;
 };
 
+HashId CalculateFileHash(const std::filesystem::path& path) {
+    auto file = File::ForRead(path);
+    auto size = file.Size();
+    HashId::Builder builder;
+    char buf[8 << 10];
+    builder.Append(DataHeader::Make(DataType::Blob, size));
+    while (size > 0) {
+        if (const size_t read = file.Read(buf, std::min(size, sizeof(buf)))) {
+            builder.Append(buf, read);
+            size -= read;
+        } else {
+            throw std::runtime_error(fmt::format("unexpected end of file '{}'", path));
+        }
+    }
+    return builder.Build();
+}
+
+Modifications CompareBlobEntry(
+    const std::string& path,
+    const PathEntry& entry,
+    const std::filesystem::directory_entry& de,
+    const Datastore& odb,
+    TreeIndex* index
+) {
+    const auto status = de.symlink_status();
+    Modifications result;
+
+    if (status.type() == std::filesystem::file_type::regular) {
+        result.type = entry.type == PathType::Symlink;
+        result.attributes =
+            (entry.type == PathType::Executible)
+            ^ ((status.permissions() & std::filesystem::perms::owner_exec) != std::filesystem::perms::none);
+
+        if (entry.size != de.file_size()) {
+            result.content = true;
+        } else {
+            const auto get_id = [&]() {
+                if (entry.data == DataType::Index) {
+                    return odb.LoadIndex(entry.id).Id();
+                } else {
+                    return entry.id;
+                }
+            };
+
+            const auto make_value = [&](const HashId& id) {
+                return fmt::format(
+                    "{}:{}:{}", int(status.type()), id, de.last_write_time().time_since_epoch().count()
+                );
+            };
+
+            if (auto ret = index->Get(path)) {
+                if (*ret == make_value(get_id())) {
+                    return result;
+                }
+            }
+
+            const auto is_hash_mismatch = [&](const HashId& file_id) {
+                index->Update(path, make_value(file_id));
+
+                return get_id() != file_id;
+            };
+
+            result.content = is_hash_mismatch(CalculateFileHash(de.path()));
+        }
+    } else if (status.type() == std::filesystem::file_type::symlink) {
+        const std::string link = std::filesystem::read_symlink(de.path());
+
+        result.type = entry.type == PathType::File || entry.type == PathType::Executible;
+        result.content = link.size() != entry.size || HashId::Make(DataType::Blob, link) != entry.id;
+    }
+
+    return result;
+}
+
 } // namespace
 
-WorkingTree::WorkingTree(const std::filesystem::path& path, Datastore odb, std::function<HashId()> cb)
+WorkingTree::WorkingTree(
+    const std::filesystem::path& path,
+    const std::filesystem::path& state,
+    Datastore odb,
+    std::function<HashId()> cb
+)
     : path_(path)
     , odb_(std::move(odb))
     , get_tree_(std::move(cb)) {
     assert(path_.is_absolute());
     assert(get_tree_);
+
+    index_ = std::make_unique<TreeIndex>(state / "index", Lmdb::Options{.create_if_missing = true});
 }
+
+WorkingTree::~WorkingTree() = default;
 
 const std::filesystem::path& WorkingTree::GetPath() const {
     return path_;
@@ -262,58 +346,6 @@ void WorkingTree::WriteBlob(const std::filesystem::path& path, const PathEntry& 
     }
 }
 
-static HashId CalculateFileHash(const std::filesystem::path& path) {
-    auto file = File::ForRead(path);
-    auto size = file.Size();
-    HashId::Builder builder;
-    char buf[8 << 10];
-    builder.Append(DataHeader::Make(DataType::Blob, size));
-    while (size > 0) {
-        if (const size_t read = file.Read(buf, std::min(size, sizeof(buf)))) {
-            builder.Append(buf, read);
-            size -= read;
-        } else {
-            throw std::runtime_error(fmt::format("unexpected end of file '{}'", path));
-        }
-    }
-    return builder.Build();
-}
-
-static Modifications CompareBlobEntry(
-    const PathEntry& entry, const std::filesystem::directory_entry& de, const Datastore& odb
-) {
-    const auto status = de.symlink_status();
-    Modifications result;
-
-    if (status.type() == std::filesystem::file_type::regular) {
-        result.type = entry.type == PathType::Symlink;
-        result.attributes =
-            (entry.type == PathType::Executible)
-            ^ ((status.permissions() & std::filesystem::perms::owner_exec) != std::filesystem::perms::none);
-
-        if (entry.size != de.file_size()) {
-            result.content = true;
-        } else {
-            const auto is_hash_mismatch = [&](const HashId& id) {
-                if (entry.data == DataType::Index) {
-                    return odb.LoadIndex(entry.id).Id() != id;
-                } else {
-                    return entry.id != id;
-                }
-            };
-
-            result.content = is_hash_mismatch(CalculateFileHash(de.path()));
-        }
-    } else if (status.type() == std::filesystem::file_type::symlink) {
-        const std::string link = std::filesystem::read_symlink(de.path());
-
-        result.type = entry.type == PathType::File || entry.type == PathType::Executible;
-        result.content = link.size() != entry.size || HashId::Make(DataType::Blob, link) != entry.id;
-    }
-
-    return result;
-}
-
 void WorkingTree::Status(const StatusOptions& options, const StageArea& stage, const StatusCallback& cb)
     const {
     auto di = std::filesystem::recursive_directory_iterator(path_);
@@ -381,6 +413,7 @@ void WorkingTree::Status(const StatusOptions& options, const StageArea& stage, c
         }
     };
 
+    index_->Start();
     state.emplace_back(std::string(), stage.ListTree(std::string()));
     try_load_ignore(path_, 0);
 
@@ -492,7 +525,8 @@ void WorkingTree::Status(const StatusOptions& options, const StageArea& stage, c
                         emit_untracked(path, *ei);
                     }
                 } else if (options.tracked) {
-                    if (const Modifications changes = CompareBlobEntry(*ei, entry, odb_)) {
+                    if (const Modifications changes =
+                            CompareBlobEntry(path, *ei, entry, odb_, index_.get())) {
                         cb(PathStatus()
                                .SetEntry(*ei)
                                .SetPath(path)
@@ -507,6 +541,7 @@ void WorkingTree::Status(const StatusOptions& options, const StageArea& stage, c
     }
 
     emit_deleted(0);
+    index_->Flush();
 }
 
 } // namespace Vcs

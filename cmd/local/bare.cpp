@@ -337,7 +337,7 @@ bool Repository::CreateWorkspace(const WorkspaceInfo& params, bool checkout) {
 
     // Checkout revision's content.
     if (checkout) {
-        WorkingTree(params.path, odb_, [tree]() { return tree; }).Checkout(tree);
+        WorkingTree(params.path, state_path, odb_, [tree]() { return tree; }).Checkout(tree);
     }
 
     return true;

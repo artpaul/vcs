@@ -110,7 +110,7 @@ Workspace::Workspace(
     config_->Reset(ConfigLocation::Workspace, Config::MakeBackend(state_path_ / "config.json"));
 
     // Working tree.
-    working_tree_ = std::make_unique<WorkingTree>(work_path, odb_, [this]() {
+    working_tree_ = std::make_unique<WorkingTree>(work_path, state_path_, odb_, [this]() {
         if (const auto id = GetCurrentHead()) {
             return odb_.LoadCommit(id).Tree();
         } else {
