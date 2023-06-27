@@ -93,7 +93,7 @@ public:
         /**
          * Get value by key.
          */
-        virtual std::expected<std::string, Status> Get(const std::string_view key) const = 0;
+        virtual std::expected<std::string_view, Status> Get(const std::string_view key) const = 0;
 
         /**
          * Put key-value pair.

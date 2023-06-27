@@ -12,7 +12,7 @@ public:
 
     void Start();
 
-    std::expected<std::string, Lmdb::Status> Get(const std::string_view key) const;
+    std::expected<std::string_view, Lmdb::Status> Get(const std::string_view key) const;
 
     void Update(std::string key, std::string value);
 

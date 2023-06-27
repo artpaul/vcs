@@ -14,7 +14,7 @@ void TreeIndex::Start() {
     }
 }
 
-std::expected<std::string, Lmdb::Status> TreeIndex::Get(const std::string_view key) const {
+std::expected<std::string_view, Lmdb::Status> TreeIndex::Get(const std::string_view key) const {
     if (reader_) {
         return reader_->Get(key);
     } else {

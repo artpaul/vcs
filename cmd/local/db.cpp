@@ -98,7 +98,7 @@ private:
             txn_.txn = nullptr;
         }
 
-        std::expected<std::string, Status> Get(const std::string_view k) const final {
+        std::expected<std::string_view, Status> Get(const std::string_view k) const final {
             MDB_val key{.mv_size = k.size(), .mv_data = (void*)k.data()};
             MDB_val val{};
 
@@ -110,7 +110,7 @@ private:
                 }
             }
 
-            return std::expected<std::string, Status>(
+            return std::expected<std::string_view, Status>(
                 std::in_place_t(), (const char*)val.mv_data, val.mv_size
             );
         }
@@ -248,7 +248,11 @@ std::expected<std::string, Status> Database::Impl::Get(const std::string_view k)
     TransactionImpl t(env_);
 
     if (auto status = t.Start(true)) {
-        return t.Get(k);
+        if (auto ret = t.Get(k)) {
+            return std::string(ret.value());
+        } else {
+            return std::unexpected(ret.error());
+        }
     } else {
         return std::unexpected(std::move(status));
     }
