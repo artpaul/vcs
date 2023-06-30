@@ -11,7 +11,6 @@
 
 #include <contrib/fmt/fmt/std.h>
 
-#include <absl/container/btree_map.h>
 #include <map>
 #include <queue>
 #include <stack>
@@ -29,28 +28,32 @@ public:
     }
 
     StatusState(std::string_view path, std::vector<std::pair<std::string, PathEntry>> entries)
-        : path_(path) {
-        for (auto& e : entries) {
-            // Entries are sorted in general so it can be inserted with hint.
-            entries_.emplace_hint(entries_.end(), std::move(e.first), std::make_pair(e.second, false));
-        }
+        : path_(path)
+        , entries_(std::move(entries)) {
+        marks_.resize(entries_.size());
     }
 
     void EnumerateDeleted(const std::function<void(const std::string&, const PathEntry&)>& cb) const {
-        for (const auto& e : entries_) {
-            if (e.second.second) {
+        for (size_t i = 0, end = entries_.size(); i != end; ++i) {
+            if (marks_[i]) {
                 continue;
             }
 
-            cb(JoinPath(path_, e.first), e.second.first);
+            cb(JoinPath(path_, entries_[i].first), entries_[i].second);
         }
     }
 
     const PathEntry* Find(const std::string_view name) {
-        if (auto ei = entries_.find(name); ei != entries_.end()) {
-            ei->second.second = true;
-            return &ei->second.first;
+        const auto ei = std::lower_bound(
+            entries_.begin(), entries_.end(), name,
+            [](const auto& item, const auto value) { return item.first < value; }
+        );
+
+        if (ei != entries_.end() && ei->first == name) {
+            marks_[ei - entries_.begin()] = true;
+            return &ei->second;
         }
+
         return nullptr;
     }
 
@@ -75,7 +78,8 @@ private:
 
 private:
     std::string path_;
-    absl::btree_map<std::string, std::pair<PathEntry, bool>, std::less<>> entries_;
+    std::vector<std::pair<std::string, PathEntry>> entries_;
+    std::vector<bool> marks_;
     std::optional<PathStatus::Status> status_;
 };
 
@@ -123,7 +127,7 @@ Modifications CompareBlobEntry(
 
             const auto make_value = [&](const HashId& id) {
                 return fmt::format(
-                    "{}:{}:{}", int(de->status()->st_mode), id, de->status()->st_mtim.tv_nsec
+                    "{}:{}:{}", int(de->status()->st_mode), id.ToBytes(), de->status()->st_mtim.tv_nsec
                 );
             };
 

@@ -222,11 +222,10 @@ std::vector<std::pair<std::string, PathEntry>> StageArea::ListTree(
             if (ei->type == PathType::Directory) {
                 const auto tree = odb_.LoadTree(ei->id);
 
-                for (const auto& e : tree.Entries()) {
-                    entries.emplace_back(
-                        e.Name(),
-                        PathEntry{.id = e.Id(), .data = e.Data(), .type = e.Type(), .size = e.Size()}
-                    );
+                entries.reserve(tree.Entries().size());
+
+                for (const auto e : tree.Entries()) {
+                    entries.emplace_back(e.Name(), static_cast<PathEntry>(e));
                 }
             }
         }
