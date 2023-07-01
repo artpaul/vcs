@@ -13,6 +13,7 @@ add_subdirectory(liblmdb)
 add_subdirectory(lz4)
 add_subdirectory(sha)
 add_subdirectory(snappy)
+add_subdirectory(subprocess)
 add_subdirectory(tlsh)
 add_subdirectory(xxhash)
 
