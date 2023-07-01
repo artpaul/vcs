@@ -57,7 +57,7 @@ void PrintBlob(const Options& options, const Workspace& repo, const PathStatus& 
 }
 
 void PrintCurrentChanges(const Options& options, const Workspace& repo) {
-    repo.Status(StatusOptions().SetInclude(PathFilter(options.paths)), [&](const PathStatus& status) {
+    const auto cb = [&](const PathStatus& status) {
         if (status.type != PathType::File) {
             return;
         }
@@ -65,7 +65,9 @@ void PrintCurrentChanges(const Options& options, const Workspace& repo) {
             PrintHeader(status, options.coloring);
             PrintBlob(options, repo, status);
         }
-    });
+    };
+
+    repo.Status(StatusOptions().SetInclude(PathFilter(options.paths)).SetUntracked(Expansion::None), cb);
 }
 
 int Execute(const Options& options, const Workspace& repo) {

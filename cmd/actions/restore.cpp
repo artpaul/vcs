@@ -19,11 +19,13 @@ struct Options {
 int Execute(const Options& options, Workspace& repo) {
     std::vector<PathStatus> tracked;
 
-    repo.Status(StatusOptions().SetInclude(PathFilter(options.paths)), [&](const PathStatus& status) {
+    const auto cb = [&](const PathStatus& status) {
         if (status.status == PathStatus::Deleted || status.status == PathStatus::Modified) {
             tracked.push_back(status);
         }
-    });
+    };
+
+    repo.Status(StatusOptions().SetInclude(PathFilter(options.paths)).SetUntracked(Expansion::None), cb);
 
     if (options.dry_run) {
         for (const auto& status : tracked) {
