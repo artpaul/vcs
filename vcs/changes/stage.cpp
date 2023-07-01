@@ -270,22 +270,29 @@ std::vector<std::pair<std::string, PathEntry>> StageArea::ListTree(
 
 bool StageArea::Remove(const std::string_view path) {
     const auto& parts = SplitPath(path);
-    Directory* cur = MutableRoot();
+    Directory* root = MutableRoot();
 
     for (size_t i = 0, end = parts.size(); i < end; ++i) {
         if (i + 1 == end) {
-            if (cur->Remove(parts[i])) {
+            if (root->Remove(parts[i])) {
                 copies_.erase(std::string(path));
                 return true;
             }
             return false;
         }
-        if (const auto e = cur->Find(parts[i])) {
+        if (const auto e = root->Find(parts[i])) {
             if (e->directory) {
-                cur = e->directory.get();
+                // Just take in-memory directory.
+                root = e->directory.get();
             } else if (IsDirectory(e->type)) {
-                e->directory = Directory::FromTree(odb_.LoadTree(e->id));
-                cur = e->directory.get();
+                // It's a directory node. Load it.
+                if (e->id) {
+                    e->directory = Directory::FromTree(odb_.LoadTree(e->id));
+                    e->id = HashId();
+                } else {
+                    e->directory = Directory::MakeEmpty();
+                }
+                root = e->directory.get();
             } else {
                 break;
             }
@@ -329,6 +336,7 @@ bool StageArea::AddImpl(const std::string_view path, const PathEntry& entry, Dir
                 // It's a directory node. Load it.
                 if (e->id) {
                     e->directory = Directory::FromTree(odb_.LoadTree(e->id));
+                    e->id = HashId();
                 } else {
                     e->directory = Directory::MakeEmpty();
                 }

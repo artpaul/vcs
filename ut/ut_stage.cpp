@@ -6,8 +6,8 @@
 
 using namespace Vcs;
 
-static PathEntry MakeBlob(const std::string_view content, Datastore* odb) {
-    const auto [id, type] = odb->Put(DataType::Blob, content);
+static PathEntry MakeBlob(const std::string_view content, Datastore odb) {
+    const auto [id, type] = odb.Put(DataType::Blob, content);
 
     return PathEntry{
         .id = id,
@@ -17,14 +17,14 @@ static PathEntry MakeBlob(const std::string_view content, Datastore* odb) {
     };
 }
 
-static HashId MakeLibTree(Datastore* odb) {
-    StageArea index(*odb);
+static HashId MakeLibTree(Datastore odb) {
+    StageArea index(odb);
 
     index.Add("lib/lib/empty", MakeBlob("", odb));
     index.Add("lib/test.h", MakeBlob("int test();", odb));
     index.Add("test", MakeBlob("", odb));
 
-    return index.SaveTree(*odb);
+    return index.SaveTree(odb);
 }
 
 TEST(StageArea, Add) {
@@ -34,8 +34,8 @@ TEST(StageArea, Add) {
     // Updating of root entry is prohibited.
     ASSERT_FALSE(index.Add("", PathEntry()));
 
-    ASSERT_TRUE(index.Add("lib/test.h", MakeBlob("int test();", &mem)));
-    ASSERT_TRUE(index.Add("lib/test.cpp", MakeBlob("#include \"test.h\"", &mem)));
+    ASSERT_TRUE(index.Add("lib/test.h", MakeBlob("int test();", mem)));
+    ASSERT_TRUE(index.Add("lib/test.cpp", MakeBlob("#include \"test.h\"", mem)));
     // Parent directories should be automatically created on insertion.
     EXPECT_TRUE(index.GetEntry("lib"));
     EXPECT_TRUE(IsDirectory(index.GetEntry("lib")->type));
@@ -44,9 +44,28 @@ TEST(StageArea, Add) {
     EXPECT_EQ(index.ListTree("lib").size(), 2u);
 }
 
+TEST(StageArea, Change) {
+    auto mem = Datastore::Make<Store::MemoryCache>();
+    StageArea index(mem, MakeLibTree(mem));
+
+    // Identifier from the base tree.
+    EXPECT_TRUE(index.GetEntry("lib")->id);
+    // Change an entry.
+    ASSERT_TRUE(index.Add("lib/test.h", MakeBlob("int test() { return 0; }", mem)));
+    // An updated directory should not have id until saved.
+    EXPECT_FALSE(index.GetEntry("lib")->id);
+
+    // Identifier from the base tree.
+    EXPECT_TRUE(index.GetEntry("lib/lib")->id);
+    // Remove child node.
+    ASSERT_TRUE(index.Remove("lib/lib/empty"));
+    // An updated directory should not have id until saved.
+    EXPECT_FALSE(index.GetEntry("lib/lib")->id);
+}
+
 TEST(StageArea, Copy) {
     auto mem = Datastore::Make<Store::MemoryCache>();
-    StageArea index(mem, MakeLibTree(&mem));
+    StageArea index(mem, MakeLibTree(mem));
 
     ASSERT_TRUE(index.Copy("lib/test.h", "util/test.h"));
     ASSERT_TRUE(index.GetEntry("util"));
@@ -55,18 +74,18 @@ TEST(StageArea, Copy) {
     EXPECT_EQ(index.GetEntry("lib/test.h")->id, index.GetEntry("util/test.h")->id);
 
     // Insert new entry.
-    ASSERT_TRUE(index.Add("lib/data", MakeBlob("x0x0x0x0x", &mem)));
+    ASSERT_TRUE(index.Add("lib/data", MakeBlob("x0x0x0x0x", mem)));
     // Source entry should be taken from the base tree.
     EXPECT_FALSE(index.Copy("lib/data", "util/data"));
 
     // Update an entry.
-    ASSERT_TRUE(index.Add("lib/test.h", MakeBlob("#pragma once;\nint test();", &mem)));
+    ASSERT_TRUE(index.Add("lib/test.h", MakeBlob("#pragma once;\nint test();", mem)));
     // Copy the entry.
     ASSERT_TRUE(index.Copy("lib/test.h", "test"));
     // Source entry should be taken from the base tree.
     EXPECT_NE(index.GetEntry("lib/test.h")->id, index.GetEntry("test")->id);
     // Copy will overwrite the current entry.
-    EXPECT_NE(index.GetEntry("test")->id, MakeBlob("", &mem).id);
+    EXPECT_NE(index.GetEntry("test")->id, MakeBlob("", mem).id);
 }
 
 TEST(StageArea, GetRoot) {
@@ -78,12 +97,12 @@ TEST(StageArea, GetRoot) {
     // The root entry is always type of tree.
     EXPECT_TRUE(IsDirectory(StageArea(mem).GetEntry("")->type));
 
-    EXPECT_TRUE(StageArea(mem, MakeLibTree(&mem)).GetEntry(""));
+    EXPECT_TRUE(StageArea(mem, MakeLibTree(mem)).GetEntry(""));
 }
 
 TEST(StageArea, GetEntry) {
     auto mem = Datastore::Make<Store::MemoryCache>();
-    StageArea index(mem, MakeLibTree(&mem));
+    StageArea index(mem, MakeLibTree(mem));
 
     // Make the index mutable.
     ASSERT_TRUE(index.Remove("test"));
@@ -96,7 +115,7 @@ TEST(StageArea, GetEntry) {
 
 TEST(StageArea, ListTree) {
     auto mem = Datastore::Make<Store::MemoryCache>();
-    StageArea index(mem, MakeLibTree(&mem));
+    StageArea index(mem, MakeLibTree(mem));
 
     EXPECT_EQ(index.ListTree("").size(), 2u);
     EXPECT_EQ(index.ListTree("lib").size(), 2u);
@@ -110,7 +129,7 @@ TEST(StageArea, ListTree) {
 
 TEST(StageIndexCase, Move) {
     auto mem = Datastore::Make<Store::MemoryCache>();
-    StageArea index(mem, MakeLibTree(&mem));
+    StageArea index(mem, MakeLibTree(mem));
 
     ASSERT_TRUE(index.Copy("lib/test.h", "util/test.h"));
     ASSERT_TRUE(index.Remove("lib/test.h"));
@@ -127,7 +146,7 @@ TEST(StageArea, Remove) {
     // Removing of root entry is prohibited.
     ASSERT_FALSE(index.Remove(""));
 
-    ASSERT_TRUE(index.Add("lib/test.h", MakeBlob("int test();", &mem)));
+    ASSERT_TRUE(index.Add("lib/test.h", MakeBlob("int test();", mem)));
     ASSERT_TRUE(index.Remove("lib/test.h"));
     ASSERT_TRUE(index.Remove("lib"));
 
@@ -139,7 +158,7 @@ TEST(StageArea, Remove) {
 
 TEST(StageArea, RestoreRemoved) {
     auto mem = Datastore::Make<Store::MemoryCache>();
-    StageArea index(mem, MakeLibTree(&mem));
+    StageArea index(mem, MakeLibTree(mem));
 
     ASSERT_TRUE(index.Remove("lib"));
     EXPECT_FALSE(index.GetEntry("lib"));
@@ -147,7 +166,7 @@ TEST(StageArea, RestoreRemoved) {
     EXPECT_TRUE(index.GetEntry("lib", true));
     EXPECT_TRUE(index.GetEntry("lib/test.h", true));
 
-    ASSERT_TRUE(index.Add("lib/test.cpp", MakeBlob("int test();", &mem)));
+    ASSERT_TRUE(index.Add("lib/test.cpp", MakeBlob("int test();", mem)));
     EXPECT_TRUE(index.GetEntry("lib"));
     EXPECT_TRUE(index.GetEntry("lib/test.cpp"));
     // Entries from the state prior delete should not reappear.
@@ -155,16 +174,16 @@ TEST(StageArea, RestoreRemoved) {
 
     ASSERT_TRUE(index.Remove("test"));
     EXPECT_TRUE(index.GetEntry("test", true));
-    ASSERT_TRUE(index.Add("test/test.h", MakeBlob("int test();", &mem)));
+    ASSERT_TRUE(index.Add("test/test.h", MakeBlob("int test();", mem)));
 }
 
 TEST(StageArea, SaveTree) {
     auto mem = Datastore::Make<Store::MemoryCache>();
     StageArea index(mem);
 
-    ASSERT_TRUE(index.Add("lib/lib/empty", MakeBlob("", &mem)));
-    ASSERT_TRUE(index.Add("lib/test.h", MakeBlob("int test();", &mem)));
-    ASSERT_TRUE(index.Add("test", MakeBlob("", &mem)));
+    ASSERT_TRUE(index.Add("lib/lib/empty", MakeBlob("", mem)));
+    ASSERT_TRUE(index.Add("lib/test.h", MakeBlob("int test();", mem)));
+    ASSERT_TRUE(index.Add("test", MakeBlob("", mem)));
 
     ASSERT_TRUE(index.SaveTree(mem));
 }
@@ -176,7 +195,7 @@ TEST(StageArea, SaveTreeEmpty) {
     // Root tree is always valid.
     ASSERT_TRUE(index.SaveTree(mem));
 
-    ASSERT_TRUE(index.Add("lib/test.h", MakeBlob("int test();", &mem)));
+    ASSERT_TRUE(index.Add("lib/test.h", MakeBlob("int test();", mem)));
     ASSERT_TRUE(index.Add("empty", PathEntry{.type = PathType::Directory}));
 
     // Empty directory was saved.
@@ -190,11 +209,11 @@ TEST(StageArea, SaveTreeUpdate) {
     HashId tree_id;
 
     {
-        StageArea index(mem, MakeLibTree(&mem));
+        StageArea index(mem, MakeLibTree(mem));
 
         ASSERT_TRUE(index.Remove("lib/test.h"));
-        ASSERT_TRUE(index.Add("test", MakeBlob("", &mem)));
-        ASSERT_TRUE(index.Add("lib/test/empty", MakeBlob("", &mem)));
+        ASSERT_TRUE(index.Add("test", MakeBlob("", mem)));
+        ASSERT_TRUE(index.Add("lib/test/empty", MakeBlob("", mem)));
         ASSERT_TRUE(index.Add("empty", PathEntry{.type = PathType::Directory}));
 
         tree_id = index.SaveTree(mem);
@@ -218,7 +237,7 @@ TEST(StageArea, SaveTreeChunked) {
 
     {
         StageArea index(mem);
-        const auto blob = MakeBlob("int test();", &mem);
+        const auto blob = MakeBlob("int test();", mem);
 
         for (size_t i = 0; i < 50; ++i) {
             ASSERT_TRUE(index.Add("name" + std::to_string(i), blob));
