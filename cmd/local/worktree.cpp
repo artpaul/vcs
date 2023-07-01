@@ -13,7 +13,7 @@
 
 #include <map>
 #include <queue>
-#include <stack>
+#include <variant>
 
 namespace Vcs {
 namespace {
@@ -27,38 +27,59 @@ public:
         , status_(status) {
     }
 
+    StatusState(std::string_view path, Tree tree)
+        : path_(path)
+        , entries_(std::move(tree)) {
+        marks_.resize(std::get<1>(entries_).Entries().size());
+    }
+
     StatusState(std::string_view path, std::vector<std::pair<std::string, PathEntry>> entries)
         : path_(path)
         , entries_(std::move(entries)) {
-        marks_.resize(entries_.size());
+        marks_.resize(std::get<2>(entries_).size());
     }
 
     void EnumerateDeleted(const std::function<void(const std::string&, const PathEntry&)>& cb) const {
-        for (size_t i = 0, end = entries_.size(); i != end; ++i) {
-            if (marks_[i]) {
-                continue;
+        const auto process = [&](const auto& entries) -> void {
+            for (size_t i = 0, end = entries.size(); i != end; ++i) {
+                if (marks_[i]) {
+                    continue;
+                }
+
+                cb(JoinPath(path_, GetName(entries[i])), GetPathEntry(entries[i]));
+            }
+        };
+
+        if (entries_.index() == 1) {
+            process(std::get<1>(entries_).Entries());
+        } else if (entries_.index() == 2) {
+            process(std::get<2>(entries_));
+        }
+    }
+
+    std::optional<PathEntry> Find(const std::string_view name) {
+        const auto process = [&](const auto& entries) -> std::optional<PathEntry> {
+            const auto ei = std::lower_bound(
+                entries.begin(), entries.end(), name,
+                [](const auto& item, const auto value) { return GetName(item) < value; }
+            );
+
+            if (ei != entries.end() && GetName((*ei)) == name) {
+                marks_[ei - entries.begin()] = true;
+
+                return GetPathEntry(*ei);
             }
 
-            cb(JoinPath(path_, entries_[i].first), entries_[i].second);
+            return {};
+        };
+
+        if (entries_.index() == 1) {
+            return process(std::get<1>(entries_).Entries());
+        } else if (entries_.index() == 2) {
+            return process(std::get<2>(entries_));
+        } else {
+            return {};
         }
-    }
-
-    const PathEntry* Find(const std::string_view name) {
-        const auto ei = std::lower_bound(
-            entries_.begin(), entries_.end(), name,
-            [](const auto& item, const auto value) { return item.first < value; }
-        );
-
-        if (ei != entries_.end() && ei->first == name) {
-            marks_[ei - entries_.begin()] = true;
-            return &ei->second;
-        }
-
-        return nullptr;
-    }
-
-    std::string JoinPath(const std::string_view name) const {
-        return JoinPath(path_, name);
     }
 
     std::optional<PathStatus::Status> Status() const noexcept {
@@ -66,6 +87,28 @@ public:
     }
 
 private:
+    template <typename T>
+    static std::string_view GetName(const T& value) noexcept {
+        if constexpr (std::is_same_v<T, Tree::Entry>) {
+            return value.Name();
+        } else if constexpr (std::is_same_v<T, std::pair<std::string, PathEntry>>) {
+            return value.first;
+        } else {
+            return std::string_view();
+        }
+    }
+
+    template <typename T>
+    static PathEntry GetPathEntry(const T& value) noexcept {
+        if constexpr (std::is_same_v<T, Tree::Entry>) {
+            return static_cast<PathEntry>(value);
+        } else if constexpr (std::is_same_v<T, std::pair<std::string, PathEntry>>) {
+            return value.second;
+        } else {
+            return {};
+        }
+    }
+
     static std::string JoinPath(std::string path, const std::string_view name) {
         if (path.empty()) {
             return std::string(name);
@@ -78,7 +121,7 @@ private:
 
 private:
     std::string path_;
-    std::vector<std::pair<std::string, PathEntry>> entries_;
+    std::variant<std::monostate, Tree, std::vector<std::pair<std::string, PathEntry>>> entries_;
     std::vector<bool> marks_;
     std::optional<PathStatus::Status> status_;
 };
@@ -417,7 +460,11 @@ void WorkingTree::Status(const StatusOptions& options, const StageArea& stage, c
             if (const auto ei = state.back().Find(filename)) {
                 if (IsDirectory(ei->type)) {
                     // Emplace entries on entering a directory.
-                    state.emplace_back(path, stage.ListTree(path));
+                    if (ei->id) {
+                        state.emplace_back(path, odb_.LoadTree(ei->id));
+                    } else {
+                        state.emplace_back(path, stage.ListTree(path));
+                    }
                 } else {
                     // type change
                 }

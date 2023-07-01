@@ -142,7 +142,7 @@ public:
         }
 
     private:
-        const P* const p_;
+        const P* p_;
         size_t i_;
     };
 
