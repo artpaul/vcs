@@ -1,4 +1,5 @@
 #include <cmd/local/workspace.h>
+#include <cmd/ui/pager.h>
 #include <cmd/ui/printer.h>
 
 #include <util/file.h>
@@ -69,6 +70,8 @@ void PrintCurrentChanges(const Options& options, const Workspace& repo) {
 
 int Execute(const Options& options, const Workspace& repo) {
     git_libgit2_init();
+    // Pager.
+    SetupPager(repo.GetConfig());
     // Changes between HEAD and state of the working tree.
     PrintCurrentChanges(options, repo);
     // Shutdown libgit2.

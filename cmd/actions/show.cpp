@@ -1,4 +1,5 @@
 #include <cmd/local/workspace.h>
+#include <cmd/ui/pager.h>
 #include <cmd/ui/printer.h>
 #include <vcs/changes/changelist.h>
 #include <vcs/changes/path.h>
@@ -177,6 +178,8 @@ int ShowCommit(const Options& options, const Commit& commit, const Datastore& od
 
 int Execute(const Options& options, const Workspace& repo) {
     const auto obj = repo.Objects().Load(options.id);
+
+    SetupPager(repo.GetConfig());
 
     switch (obj.Type()) {
         case DataType::Blob:

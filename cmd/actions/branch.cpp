@@ -1,4 +1,5 @@
 #include <cmd/local/workspace.h>
+#include <cmd/ui/pager.h>
 #include <vcs/object/commit.h>
 #include <vcs/store/memory.h>
 
@@ -229,6 +230,8 @@ int Execute(const Options& options, Workspace& repo) {
         return DeleteBranches(options, repo);
     }
     if (options.list || options.names.empty()) {
+        SetupPager(repo.GetConfig());
+
         if (options.remotes) {
             return ListRemoteBranches(options, repo);
         } else {

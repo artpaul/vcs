@@ -18,14 +18,18 @@ target_sources(vcs-local PRIVATE
     "local/index.cpp"
     "local/workspace.cpp"
     "local/worktree.cpp"
-    "ui/color.cpp"
-    "ui/printer.cpp"
 )
 
 target_link_libraries(vcs
     contrib-cxxopts
-    libvcs3
+    contrib-subprocess
     vcs-local
+)
+
+target_sources(vcs PRIVATE
+    "ui/color.cpp"
+    "ui/pager.cpp"
+    "ui/printer.cpp"
 )
 
 target_sources(vcs PRIVATE

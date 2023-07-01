@@ -1,5 +1,6 @@
 #include <cmd/local/workspace.h>
 #include <cmd/ui/color.h>
+#include <cmd/ui/pager.h>
 #include <vcs/object/commit.h>
 
 #include <util/tty.h>
@@ -164,6 +165,8 @@ int ExecuteLog(int argc, char* argv[], const std::function<Workspace&()>& cb) {
             options.head = cb().GetCurrentHead();
         }
     }
+
+    SetupPager(cb().GetConfig());
 
     return Execute(options, cb());
 }

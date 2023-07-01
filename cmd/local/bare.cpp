@@ -21,7 +21,7 @@ nlohmann::json GetDefaultConfig() {
         // Coloring mode.
         {"color", {{"ui", "auto"}}},
         // Default pager.
-        {"core", {{"pager", ""}}},
+        {"core", {{"pager", "less -rFX"}}},
     });
 }
 

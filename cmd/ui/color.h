@@ -14,7 +14,7 @@ enum class ColorMode {
     Always,
 };
 
-bool IsColored(const ColorMode mode, FILE* output);
+bool IsColored(const ColorMode mode, FILE* output) noexcept;
 
 std::optional<ColorMode> ParseColorMode(const std::string_view value);
 
