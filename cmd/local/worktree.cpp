@@ -18,6 +18,51 @@
 namespace Vcs {
 namespace {
 
+struct IndexValue {
+    HashId id;
+    PathType type;
+    size_t size;
+    struct timespec ctime;
+    struct timespec mtime;
+
+    IndexValue() = default;
+
+    IndexValue(const std::string_view data) noexcept {
+        if (data.size() == sizeof(IndexValue)) {
+            std::memcpy(this, data.data(), sizeof(IndexValue));
+        } else {
+            std::memset(this, 0, sizeof(IndexValue));
+        }
+    }
+
+    static std::string Make(const HashId& id, const struct stat* st) {
+        IndexValue value;
+        value.id = id;
+        value.size = st->st_size;
+        value.ctime = st->st_ctim;
+        value.mtime = st->st_mtim;
+        if (S_ISLNK(st->st_mode)) {
+            value.type = PathType::Symlink;
+        } else if (S_ISDIR(st->st_mode)) {
+            value.type = PathType::Directory;
+        } else if (S_ISREG(st->st_mode)) {
+            if ((st->st_mode & S_IEXEC) != 0) {
+                value.type = PathType::Executible;
+            } else {
+                value.type = PathType::File;
+            }
+        }
+
+        return std::string((const char*)&value, sizeof(value));
+    }
+
+    static bool ComparePathEntry(const std::string_view data, const PathEntry& e) noexcept {
+        IndexValue value(data);
+
+        return !CompareEntries(e, PathEntry{.id = value.id, .type = value.type, .size = value.size});
+    }
+};
+
 class StatusState {
 public:
     StatusState() = default;
@@ -126,6 +171,10 @@ private:
     std::optional<PathStatus::Status> status_;
 };
 
+bool CompareTimespec(const struct timespec& a, const struct timespec& b) noexcept {
+    return std::make_tuple(a.tv_sec, a.tv_nsec) == std::make_tuple(b.tv_sec, b.tv_nsec);
+}
+
 HashId CalculateFileHash(const std::filesystem::path& path) {
     auto file = File::ForRead(path);
     auto size = file.Size();
@@ -168,20 +217,25 @@ Modifications CompareBlobEntry(
                 }
             };
 
-            const auto make_value = [&](const HashId& id) {
-                return fmt::format(
-                    "{}:{}:{}", int(de->status()->st_mode), id.ToBytes(), de->status()->st_mtim.tv_nsec
-                );
-            };
+            if (const auto ret = index->Get(path)) {
+                IndexValue value(*ret);
 
-            if (auto ret = index->Get(path)) {
-                if (*ret == make_value(get_id())) {
-                    return result;
+                if (CompareTimespec(value.ctime, de->status()->st_ctim)
+                    && CompareTimespec(value.mtime, de->status()->st_mtim))
+                {
+                    auto changes = CompareEntries(
+                        PathEntry{.id = get_id(), .type = entry.type, .size = entry.size},
+                        PathEntry{.id = value.id, .type = value.type, .size = value.size}
+                    );
+
+                    if (!changes) {
+                        return Modifications();
+                    }
                 }
             }
 
             const auto is_hash_mismatch = [&](const HashId& file_id) {
-                index->Update(std::string(path), make_value(file_id));
+                index->Update(std::string(path), IndexValue::Make(file_id, de->status()));
 
                 return get_id() != file_id;
             };
