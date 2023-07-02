@@ -37,6 +37,8 @@ void BranchInfo(const Options&, const Workspace& repo) {
 }
 
 void ChangesInfo(const Options& options, const Workspace& repo) {
+    const auto cwd = std::filesystem::current_path();
+
     std::vector<PathStatus> tracked;
     std::vector<PathStatus> ignored;
     std::vector<PathStatus> untracked;
@@ -96,7 +98,7 @@ void ChangesInfo(const Options& options, const Workspace& repo) {
             fmt::print(
                 "\t{}\n", fmt::styled(
                               fmt::format(
-                                  "{}{}{}", status_name(), status.path,
+                                  "{}{}{}", status_name(), repo.ToRelativePath(status.path, cwd),
                                   (status.type == PathType::Directory ? "/" : "")
                               ),
                               status_style()
@@ -109,7 +111,10 @@ void ChangesInfo(const Options& options, const Workspace& repo) {
         fmt::print("  (use \"vcs commit <file>...\" if you want to track changes to file)\n");
 
         for (const auto& status : untracked) {
-            fmt::print("\t{}{}\n", status.path, (status.type == PathType::Directory ? "/" : ""));
+            fmt::print(
+                "\t{}{}\n", repo.ToRelativePath(status.path, cwd),
+                (status.type == PathType::Directory ? "/" : "")
+            );
         }
     }
 
@@ -118,7 +123,10 @@ void ChangesInfo(const Options& options, const Workspace& repo) {
         // TODO: how to commit ignored files.
 
         for (const auto& status : ignored) {
-            fmt::print("\t{}{}\n", status.path, (status.type == PathType::Directory ? "/" : ""));
+            fmt::print(
+                "\t{}{}\n", repo.ToRelativePath(status.path, cwd),
+                (status.type == PathType::Directory ? "/" : "")
+            );
         }
     }
 

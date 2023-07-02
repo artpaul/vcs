@@ -80,6 +80,8 @@ public:
     /** Converts working tree path to filesystem path. */
     std::filesystem::path ToAbsolutePath(const std::string& path) const;
 
+    std::string ToRelativePath(const std::string& path, const std::filesystem::path& root) const;
+
     /** Converts filesystem path to a path relative the working tree. */
     std::string ToTreePath(const std::filesystem::path& path) const;
 
