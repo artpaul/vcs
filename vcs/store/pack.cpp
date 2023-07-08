@@ -724,7 +724,7 @@ Leveled::PackTable::PackTable(const std::filesystem::path& index, const std::fil
     pack_file_.first = std::make_unique<FileMap>(pack_file_.second);
     data_ = {(const std::byte*)pack_file_.first->Map(), pack_file_.second.Size()};
 
-    cache_ = Store::MemoryCache::Make();
+    cache_ = Store::MemoryCache<>::Make();
 }
 
 void Leveled::PackTable::Enumerate(const std::function<bool(const HashId&, const DataHeader)>& cb) const {
@@ -786,13 +786,9 @@ Object Leveled::PackTable::Load(const HashId& id, const DataType expected) const
         }
 
         if (tag->IsDelta()) {
-            {
-                absl::MutexLock lock(&mutex_);
-
-                if (auto obj = cache_->Load(base_id, expected)) {
-                    base = obj;
-                    break;
-                }
+            if (auto obj = cache_->Load(base_id, expected)) {
+                base = obj;
+                break;
             }
 
             parts.emplace_back(entry, data, base_id, *tag);
@@ -879,8 +875,6 @@ Object Leveled::PackTable::Load(const HashId& id, const DataType expected) const
 
         if (base.Type() == DataType::Blob || base.Type() == DataType::Tree) {
             if (parts.size() > 1 || std::get<3>(parts[0]).IsDelta()) {
-                absl::MutexLock lock(&mutex_);
-
                 cache_->Put(base_id, base);
             }
         }

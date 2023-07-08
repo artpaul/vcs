@@ -220,7 +220,7 @@ void Repository::PathLog(
     }
 
     //
-    auto odb = odb_.Cache(Store::MemoryCache::Make());
+    auto odb = odb_.Cache(Store::MemoryCache<Store::NoLock>::Make());
     //
     std::optional<std::pair<HashId, PathEntry>> prev;
 

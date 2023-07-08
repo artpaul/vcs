@@ -277,7 +277,8 @@ StageArea* Workspace::GetStage() const {
         const auto head = GetCurrentHead();
 
         stage_ = std::make_unique<StageArea>(
-            odb_.Cache(Store::MemoryCache::Make()), head ? odb_.LoadCommit(head).Tree() : HashId()
+            odb_.Cache(Store::MemoryCache<Store::NoLock>::Make()),
+            head ? odb_.LoadCommit(head).Tree() : HashId()
         );
     }
 

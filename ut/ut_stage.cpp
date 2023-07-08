@@ -28,7 +28,7 @@ static HashId MakeLibTree(Datastore odb) {
 }
 
 TEST(StageArea, Add) {
-    auto mem = Datastore::Make<Store::MemoryCache>();
+    auto mem = Datastore::Make<Store::MemoryCache<Store::NoLock>>();
     StageArea index(mem);
 
     // Updating of root entry is prohibited.
@@ -45,7 +45,7 @@ TEST(StageArea, Add) {
 }
 
 TEST(StageArea, Change) {
-    auto mem = Datastore::Make<Store::MemoryCache>();
+    auto mem = Datastore::Make<Store::MemoryCache<Store::NoLock>>();
     StageArea index(mem, MakeLibTree(mem));
 
     // Identifier from the base tree.
@@ -64,7 +64,7 @@ TEST(StageArea, Change) {
 }
 
 TEST(StageArea, Copy) {
-    auto mem = Datastore::Make<Store::MemoryCache>();
+    auto mem = Datastore::Make<Store::MemoryCache<Store::NoLock>>();
     StageArea index(mem, MakeLibTree(mem));
 
     ASSERT_TRUE(index.Copy("lib/test.h", "util/test.h"));
@@ -89,7 +89,7 @@ TEST(StageArea, Copy) {
 }
 
 TEST(StageArea, GetRoot) {
-    auto mem = Datastore::Make<Store::MemoryCache>();
+    auto mem = Datastore::Make<Store::MemoryCache<Store::NoLock>>();
 
     // The root entry always exists.
     EXPECT_TRUE(StageArea(mem).GetEntry(""));
@@ -101,7 +101,7 @@ TEST(StageArea, GetRoot) {
 }
 
 TEST(StageArea, GetEntry) {
-    auto mem = Datastore::Make<Store::MemoryCache>();
+    auto mem = Datastore::Make<Store::MemoryCache<Store::NoLock>>();
     StageArea index(mem, MakeLibTree(mem));
 
     // Make the index mutable.
@@ -114,7 +114,7 @@ TEST(StageArea, GetEntry) {
 }
 
 TEST(StageArea, ListTree) {
-    auto mem = Datastore::Make<Store::MemoryCache>();
+    auto mem = Datastore::Make<Store::MemoryCache<Store::NoLock>>();
     StageArea index(mem, MakeLibTree(mem));
 
     EXPECT_EQ(index.ListTree("").size(), 2u);
@@ -128,7 +128,7 @@ TEST(StageArea, ListTree) {
 }
 
 TEST(StageIndexCase, Move) {
-    auto mem = Datastore::Make<Store::MemoryCache>();
+    auto mem = Datastore::Make<Store::MemoryCache<Store::NoLock>>();
     StageArea index(mem, MakeLibTree(mem));
 
     ASSERT_TRUE(index.Copy("lib/test.h", "util/test.h"));
@@ -140,7 +140,7 @@ TEST(StageIndexCase, Move) {
 }
 
 TEST(StageArea, Remove) {
-    auto mem = Datastore::Make<Store::MemoryCache>();
+    auto mem = Datastore::Make<Store::MemoryCache<Store::NoLock>>();
     StageArea index(mem);
 
     // Removing of root entry is prohibited.
@@ -157,7 +157,7 @@ TEST(StageArea, Remove) {
 }
 
 TEST(StageArea, RestoreRemoved) {
-    auto mem = Datastore::Make<Store::MemoryCache>();
+    auto mem = Datastore::Make<Store::MemoryCache<Store::NoLock>>();
     StageArea index(mem, MakeLibTree(mem));
 
     ASSERT_TRUE(index.Remove("lib"));
@@ -178,7 +178,7 @@ TEST(StageArea, RestoreRemoved) {
 }
 
 TEST(StageArea, SaveTree) {
-    auto mem = Datastore::Make<Store::MemoryCache>();
+    auto mem = Datastore::Make<Store::MemoryCache<Store::NoLock>>();
     StageArea index(mem);
 
     ASSERT_TRUE(index.Add("lib/lib/empty", MakeBlob("", mem)));
@@ -189,7 +189,7 @@ TEST(StageArea, SaveTree) {
 }
 
 TEST(StageArea, SaveTreeEmpty) {
-    auto mem = Datastore::Make<Store::MemoryCache>();
+    auto mem = Datastore::Make<Store::MemoryCache<Store::NoLock>>();
     StageArea index(mem);
 
     // Root tree is always valid.
@@ -205,7 +205,7 @@ TEST(StageArea, SaveTreeEmpty) {
 }
 
 TEST(StageArea, SaveTreeUpdate) {
-    auto mem = Datastore::Make<Store::MemoryCache>();
+    auto mem = Datastore::Make<Store::MemoryCache<Store::NoLock>>();
     HashId tree_id;
 
     {
@@ -232,7 +232,7 @@ TEST(StageArea, SaveTreeUpdate) {
 }
 
 TEST(StageArea, SaveTreeChunked) {
-    auto mem = Datastore(1024).Chain<Store::MemoryCache>(1u << 20);
+    auto mem = Datastore(1024).Chain<Store::MemoryCache<Store::NoLock>>(1u << 20);
     HashId tree_id;
 
     {

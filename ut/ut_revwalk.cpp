@@ -49,7 +49,7 @@ private:
 } // namespace
 
 TEST(RevisionGraphWalker, CommitsInBranch) {
-    auto mem = Datastore::Make<Store::MemoryCache>();
+    auto mem = Datastore::Make<Store::MemoryCache<Store::NoLock>>();
     UT::Graph graph(mem);
 
     graph.MakeCommit(1);
@@ -79,7 +79,7 @@ TEST(RevisionGraphWalker, CommitsInBranch) {
 }
 
 TEST(RevisionGraphWalker, HideAll) {
-    auto mem = Datastore::Make<Store::MemoryCache>();
+    auto mem = Datastore::Make<Store::MemoryCache<Store::NoLock>>();
     UT::Graph graph(mem);
 
     graph.MakeCommit(1);
@@ -101,7 +101,7 @@ TEST(RevisionGraphWalker, HideAll) {
 }
 
 TEST(RevisionGraphWalker, WalkFirstParent) {
-    auto mem = Datastore::Make<Store::MemoryCache>();
+    auto mem = Datastore::Make<Store::MemoryCache<Store::NoLock>>();
     UT::Graph graph(mem);
 
     graph.MakeCommit(1);

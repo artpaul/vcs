@@ -53,7 +53,7 @@ TEST(Change, CompareEntries) {
 }
 
 TEST(ChangelistBuilder, Changes) {
-    auto mem = Datastore::Make<Store::MemoryCache>();
+    auto mem = Datastore::Make<Store::MemoryCache<Store::NoLock>>();
 
     HashId tree_lib = MakeTreeLib(mem);
     HashId tree_util = MakeTreeUtil(mem);
@@ -81,7 +81,7 @@ TEST(ChangelistBuilder, Changes) {
 }
 
 TEST(ChangelistBuilder, ChangesWithTrees) {
-    auto mem = Datastore::Make<Store::MemoryCache>();
+    auto mem = Datastore::Make<Store::MemoryCache<Store::NoLock>>();
 
     HashId tree_lib = MakeTreeLib(mem);
     HashId tree_util = MakeTreeUtil(mem);
@@ -117,7 +117,7 @@ TEST(ChangelistBuilder, ChangesWithTrees) {
 }
 
 TEST(ChangelistBuilder, ChangesNoDirectoryExpansion) {
-    auto mem = Datastore::Make<Store::MemoryCache>();
+    auto mem = Datastore::Make<Store::MemoryCache<Store::NoLock>>();
 
     HashId tree_lib = MakeTreeLib(mem);
     HashId tree_util = MakeTreeUtil(mem);
@@ -143,7 +143,7 @@ TEST(ChangelistBuilder, ChangesNoDirectoryExpansion) {
 }
 
 TEST(ChangelistBuilder, ExpandDeleted) {
-    auto mem = Datastore::Make<Store::MemoryCache>();
+    auto mem = Datastore::Make<Store::MemoryCache<Store::NoLock>>();
 
     StageArea index(mem);
 
@@ -173,7 +173,7 @@ TEST(ChangelistBuilder, ExpandDeleted) {
 }
 
 TEST(ChangelistBuilder, IncludeFilter) {
-    auto mem = Datastore::Make<Store::MemoryCache>();
+    auto mem = Datastore::Make<Store::MemoryCache<Store::NoLock>>();
     auto filter = PathFilter({"lib/test.h", "util"});
 
     const HashId tree_lib = MakeTreeLib(mem);

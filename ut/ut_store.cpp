@@ -80,9 +80,9 @@ TEST(Datastore, Fanout) {
 }
 
 TEST(Datastore, Cache) {
-    auto mem1 = Store::MemoryCache::Make(1024);
-    auto mem2 = Store::MemoryCache::Make(1024);
-    auto mem3 = Store::MemoryCache::Make(1024);
+    auto mem1 = Store::MemoryCache<Store::NoLock>::Make(1024);
+    auto mem2 = Store::MemoryCache<Store::NoLock>::Make(1024);
+    auto mem3 = Store::MemoryCache<Store::NoLock>::Make(1024);
 
     // Setup datastore.
     auto odb = Datastore().Chain(mem1).Chain(mem2).Cache(mem3);
@@ -103,11 +103,11 @@ TEST(Datastore, GetChunkSize) {
     EXPECT_EQ(Datastore(1024).GetChunkSize(), 1024u);
     EXPECT_EQ(Datastore(4096).GetChunkSize(), 4096u);
 
-    EXPECT_EQ(Datastore(1024).Chain<Store::MemoryCache>(4096).GetChunkSize(), 1024u);
+    EXPECT_EQ(Datastore(1024).Chain<Store::MemoryCache<Store::NoLock>>(4096).GetChunkSize(), 1024u);
 }
 
 TEST(Datastore, InputStream) {
-    auto mem = Store::MemoryCache::Make(1024);
+    auto mem = Store::MemoryCache<Store::NoLock>::Make(1024);
     auto odb = Datastore(256).Chain(mem);
     auto data = std::string();
     auto stream = StringInput(data);
@@ -143,7 +143,7 @@ TEST(MemoryCache, Capacity) {
     }
 
     {
-        auto mem = Datastore::Make<Store::MemoryCache>(1024);
+        auto mem = Datastore::Make<Store::MemoryCache<Store::NoLock>>(1024);
         // Put an object.
         mem.Put(DataType::Blob, blobs[0].second);
         // Check that the object exists in the storage.
@@ -157,7 +157,7 @@ TEST(MemoryCache, Capacity) {
     }
 
     {
-        auto mem = Datastore::Make<Store::MemoryCache>(1024);
+        auto mem = Datastore::Make<Store::MemoryCache<Store::NoLock>>(1024);
         // Put and object.
         mem.Put(DataType::Blob, blobs[0].second);
         // Check that the object exists in the storage.
@@ -189,7 +189,7 @@ TEST(MemoryCache, BlobChunked) {
     ASSERT_EQ(content.size(), 8703u);
 
     {
-        auto mem = Datastore(1u << 20).Chain<Store::MemoryCache>(4u << 20);
+        auto mem = Datastore(1u << 20).Chain<Store::MemoryCache<Store::NoLock>>(4u << 20);
         const auto [id, _] = mem.Put(DataType::Blob, content);
 
         ASSERT_TRUE(mem.IsExists(id));
@@ -198,7 +198,7 @@ TEST(MemoryCache, BlobChunked) {
     }
 
     {
-        auto mem = Datastore(1024).Chain<Store::MemoryCache>(1u << 20);
+        auto mem = Datastore(1024).Chain<Store::MemoryCache<Store::NoLock>>(1u << 20);
         const auto [id, type] = mem.Put(DataType::Blob, content);
 
         ASSERT_TRUE(mem.IsExists(id));
@@ -220,7 +220,7 @@ TEST(MemoryCache, TreeChunked) {
         );
     }
 
-    auto mem = Datastore(1024).Chain<Store::MemoryCache>(1u << 20);
+    auto mem = Datastore(1024).Chain<Store::MemoryCache<Store::NoLock>>(1u << 20);
     const auto [id, _] = mem.Put(DataType::Tree, builder.Serialize());
 
     ASSERT_TRUE(mem.IsExists(id));

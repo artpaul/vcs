@@ -113,7 +113,7 @@ int ListRemoteBranches(const Options& options, const Workspace& repo) {
 
     // Print branch names with extra information.
     if (options.show_commit) {
-        auto odb = repo.Objects().Cache(Store::MemoryCache::Make());
+        auto odb = repo.Objects().Cache(Store::MemoryCache<Store::NoLock>::Make());
         auto longest_name = size_t(0);
         // Calculate size of longest name.
         for (const auto& [remote, branches] : remotes) {
@@ -174,7 +174,7 @@ int ListBranches(const Options& options, const Workspace& repo) {
 
     // Print branch names with extra information.
     if (options.show_commit) {
-        auto odb = repo.Objects().Cache(Store::MemoryCache::Make());
+        auto odb = repo.Objects().Cache(Store::MemoryCache<Store::NoLock>::Make());
         auto longest_name = size_t(0);
         // Calculate size of longest name.
         for (const auto& b : branches) {

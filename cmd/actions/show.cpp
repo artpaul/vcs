@@ -125,7 +125,7 @@ int ShowCommit(const Options& options, const Commit& commit, const Datastore& od
     } else {
         const auto from = commit.Parents() ? odb.Load(commit.Parents()[0]).AsCommit().Tree() : HashId();
         const auto to = options.id ? odb.Load(options.id).AsCommit().Tree() : HashId();
-        auto stage_odb = odb.Cache(Store::MemoryCache::Make());
+        auto stage_odb = odb.Cache(Store::MemoryCache<Store::NoLock>::Make());
 
         const auto cb = [&, first = true](const Change& change) mutable {
             if (change.type != PathType::File) {

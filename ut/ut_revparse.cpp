@@ -39,7 +39,7 @@ class RevpasrseTest
     , protected ReferenceResolver {
 public:
     RevpasrseTest()
-        : odb_(Datastore::Make<Store::MemoryCache>())
+        : odb_(Datastore::Make<Store::MemoryCache<Store::NoLock>>())
         , graph_(odb_) {
         tree_id_ = MakeLibTree(odb_);
     }

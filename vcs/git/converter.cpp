@@ -188,7 +188,7 @@ private:
     git_repository* repo_{nullptr};
     std::function<HashId(const HashId&)> remap_;
     std::shared_ptr<std::unordered_map<HashId, PathEntry>> blob_cache_;
-    std::shared_ptr<Store::MemoryCache> tree_cache_;
+    std::shared_ptr<Store::MemoryCache<Store::NoLock>> tree_cache_;
 };
 
 Converter::Impl::Impl(const std::filesystem::path& path, const Options& options)
@@ -201,7 +201,7 @@ Converter::Impl::Impl(const std::filesystem::path& path, const Options& options)
         blob_cache_ = std::make_shared<std::unordered_map<HashId, PathEntry>>();
     }
 
-    tree_cache_ = Store::MemoryCache::Make(32u << 20);
+    tree_cache_ = Store::MemoryCache<Store::NoLock>::Make(32u << 20);
 }
 
 Converter::Impl::~Impl() {

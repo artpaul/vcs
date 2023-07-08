@@ -353,7 +353,7 @@ void WorkingTree::Checkout(const std::string& p, const PathEntry& entry) {
 }
 
 bool WorkingTree::SwitchTo(const HashId& tree_id) {
-    Datastore odb = odb_.Cache(Store::MemoryCache::Make());
+    Datastore odb = odb_.Cache(Store::MemoryCache<Store::NoLock>::Make());
     StageArea stage(odb, tree_id);
 
     auto cb = [&](const Change& change) {

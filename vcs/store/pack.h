@@ -181,7 +181,6 @@ public:
         std::span<const std::byte> data_;
         std::span<const std::byte> index_;
 
-        mutable absl::Mutex mutex_;
         std::shared_ptr<Datastore::Backend> cache_;
     };
 
