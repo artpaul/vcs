@@ -1,5 +1,6 @@
 #pragma once
 
+#include "meta.h"
 #include "mount.h"
 
 #include <vcs/changes/stage.h>
@@ -11,7 +12,13 @@
 
 namespace Vcs::Fs {
 
-struct BlobHandle {
+class Metabase;
+
+struct BaseHandle {
+    Meta meta;
+};
+
+struct BlobHandle : BaseHandle {
     /// Flags which the file was opened with.
     const int flags = 0;
     /// Handle of an immutable blob object.
@@ -22,7 +29,7 @@ struct BlobHandle {
     }
 };
 
-struct DirectoryHandle {
+struct DirectoryHandle : BaseHandle {
     Tree tree;
 
     explicit DirectoryHandle(Tree obj) noexcept
@@ -37,18 +44,18 @@ class Filesystem {
 public:
     explicit Filesystem(const MountOptions& options);
 
+    ~Filesystem();
+
 public:
-    int GetAttr(const std::string_view path, struct stat*, struct fuse_file_info*);
+    int GetAttr(const std::string_view path, struct stat*, fuse_file_info*);
 
-    int Open(const std::string_view path, struct fuse_file_info* fi);
+    int Open(const std::string_view path, fuse_file_info* fi);
 
-    int OpenDir(const std::string_view path, struct fuse_file_info* fi);
+    int OpenDir(const std::string_view path, fuse_file_info* fi);
 
-    int Read(char* buf, size_t size, off_t offset, struct fuse_file_info* fi);
+    int Read(char* buf, size_t size, off_t offset, fuse_file_info* fi);
 
-    int ReadDir(
-        void* buf, fuse_fill_dir_t filler, off_t off, struct fuse_file_info* fi, enum fuse_readdir_flags
-    );
+    int ReadDir(void* buf, fuse_fill_dir_t filler, off_t off, fuse_file_info* fi, enum fuse_readdir_flags);
 
     int ReadLink(const std::string_view path, char* buf, size_t size);
 
@@ -67,7 +74,9 @@ private:
     Datastore trees_;
     StageArea stage_;
     HashId tree_;
-    time_t start_time_;
+    timespec root_time_;
+
+    std::unique_ptr<Metabase> metabase_;
 
     uid_t euid_;
     uid_t egid_;

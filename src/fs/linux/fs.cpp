@@ -1,4 +1,5 @@
 #include "fs.h"
+#include "db.h"
 
 #include <cmd/local/bare.h>
 #include <vcs/store/memory.h>
@@ -10,7 +11,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-static constexpr bool operator<(const struct timespec& a, const struct timespec& b) noexcept {
+static constexpr bool operator<(const timespec& a, const timespec& b) noexcept {
     return std::make_tuple(a.tv_sec, a.tv_nsec) < std::make_tuple(b.tv_sec, b.tv_nsec);
 }
 
@@ -29,21 +30,31 @@ Filesystem::Filesystem(const MountOptions& options)
     , trees_(odb_.Cache(Store::MemoryCache<>::Make()))
     , stage_(trees_, options.tree)
     , tree_(options.tree) {
-    start_time_ = std::time(nullptr);
+    root_time_ = timespec{.tv_sec = std::time(nullptr), .tv_nsec = 0};
+
+    metabase_ = std::make_unique<Metabase>((options.state_path / "meta").string());
 
     euid_ = geteuid();
     egid_ = getegid();
 }
 
-int Filesystem::GetAttr(const std::string_view path, struct stat* st, struct fuse_file_info*) {
+Filesystem::~Filesystem() = default;
+
+int Filesystem::GetAttr(const std::string_view path, struct stat* st, fuse_file_info*) {
     if (const auto e = stage_.GetEntry(path)) {
         SetupAttributes(*e, st);
+
+        if (auto meta = metabase_->GetMetadata(path)) {
+            st->st_ctim = meta->ctime;
+            st->st_mtim = meta->mtime;
+            st->st_atim = std::max(st->st_ctim, st->st_mtim);
+        }
         return 0;
     }
     return -ENOENT;
 }
 
-int Filesystem::Open(const std::string_view path, struct fuse_file_info* fi) {
+int Filesystem::Open(const std::string_view path, fuse_file_info* fi) {
     const auto e = stage_.GetEntry(path);
     // Read-only right now.
     if (fi->flags & (O_APPEND | O_TRUNC | O_WRONLY)) {
@@ -61,10 +72,13 @@ int Filesystem::Open(const std::string_view path, struct fuse_file_info* fi) {
     fi->keep_cache = 1;
     fi->noflush = 1;
 
+    // Remember access time.
+    metabase_->PutTimestamps(path, Timestamps{.ctime = root_time_, .mtime = root_time_});
+
     return 0;
 }
 
-int Filesystem::OpenDir(const std::string_view path, struct fuse_file_info* fi) {
+int Filesystem::OpenDir(const std::string_view path, fuse_file_info* fi) {
     const auto e = stage_.GetEntry(path);
     // Check entry exists.
     if (!e) {
@@ -82,7 +96,7 @@ int Filesystem::OpenDir(const std::string_view path, struct fuse_file_info* fi) 
     return 0;
 }
 
-int Filesystem::Read(char* buf, size_t size, off_t offset, struct fuse_file_info* fi) {
+int Filesystem::Read(char* buf, size_t size, off_t offset, fuse_file_info* fi) {
     if (!fi) {
         return -EBADF;
     }
@@ -105,9 +119,7 @@ int Filesystem::Read(char* buf, size_t size, off_t offset, struct fuse_file_info
     return -EIO;
 }
 
-int Filesystem::ReadDir(
-    void* buf, fuse_fill_dir_t filler, off_t, struct fuse_file_info* fi, fuse_readdir_flags
-) {
+int Filesystem::ReadDir(void* buf, fuse_fill_dir_t filler, off_t, fuse_file_info* fi, fuse_readdir_flags) {
     filler(buf, ".", nullptr, 0, fuse_fill_dir_flags(0));
     filler(buf, "..", nullptr, 0, fuse_fill_dir_flags(0));
 
@@ -141,6 +153,9 @@ int Filesystem::ReadLink(const std::string_view path, char* buf, size_t size) {
     std::memcpy(buf, blob.Data(), size);
     // Set null terminator.
     buf[size] = '\0';
+
+    // Remember access time.
+    metabase_->PutTimestamps(path, Timestamps{.ctime = root_time_, .mtime = root_time_});
 
     return 0;
 }
@@ -191,8 +206,8 @@ void Filesystem::SetupAttributes(const PathEntry& e, struct stat* st) const noex
             break;
     }
     // Timestamps.
-    st->st_ctim.tv_sec = start_time_;
-    st->st_mtim.tv_sec = start_time_;
+    st->st_ctim = root_time_;
+    st->st_mtim = root_time_;
     st->st_atim = std::max(st->st_ctim, st->st_mtim);
     // System-wide attributes.
     st->st_gid = egid_;
