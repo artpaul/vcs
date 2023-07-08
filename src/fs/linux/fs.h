@@ -16,6 +16,10 @@ class Metabase;
 
 struct BaseHandle {
     Meta meta;
+
+    explicit BaseHandle(const Meta& m) noexcept
+        : meta(m) {
+    }
 };
 
 struct BlobHandle : BaseHandle {
@@ -24,16 +28,18 @@ struct BlobHandle : BaseHandle {
     /// Handle of an immutable blob object.
     std::optional<Object> blob;
 
-    explicit BlobHandle(Object obj) noexcept
-        : blob(std::move(obj)) {
+    explicit BlobHandle(const Meta& m, Object obj) noexcept
+        : BaseHandle(m)
+        , blob(std::move(obj)) {
     }
 };
 
 struct DirectoryHandle : BaseHandle {
     Tree tree;
 
-    explicit DirectoryHandle(Tree obj) noexcept
-        : tree(std::move(obj)) {
+    explicit DirectoryHandle(const Meta& m, Tree obj) noexcept
+        : BaseHandle(m)
+        , tree(std::move(obj)) {
     }
 };
 
@@ -66,6 +72,8 @@ public:
     int StatFs(struct statvfs* fs);
 
 private:
+    Meta GetActualMetadata(const std::string_view path, const PathEntry& e) const;
+
     void SetupAttributes(const PathEntry& e, struct stat* st) const noexcept;
 
 private:

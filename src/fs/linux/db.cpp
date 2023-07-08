@@ -25,7 +25,7 @@ Metabase::~Metabase() {
     delete db_;
 }
 
-std::optional<Meta> Metabase::GetMetadata(const std::string_view path) const {
+auto Metabase::GetMetadata(const std::string_view path) const -> std::optional<Value> {
     std::string value;
 
     const auto status = db_->Get(ReadOptions(), Slice(path.data(), path.size()), &value);
@@ -33,10 +33,9 @@ std::optional<Meta> Metabase::GetMetadata(const std::string_view path) const {
         return {};
     }
 
-    auto result = std::make_optional<Meta>();
     // An empty value represents a tombstone marker.
     if (value.empty()) {
-        return result;
+        return std::make_optional<Value>();
     }
     // The value stores just timestamps.
     if (value.size() == sizeof(Timestamps)) {
@@ -44,17 +43,15 @@ std::optional<Meta> Metabase::GetMetadata(const std::string_view path) const {
         // Copy the value.
         std::memcpy(&ts, value.data(), value.size());
 
-        result->ctime = ts.ctime;
-        result->mtime = ts.mtime;
-
-        return result;
+        return std::optional<Value>(std::in_place_t(), ts);
     }
     // The value stores the full metadata.
     if (value.size() == sizeof(Meta)) {
+        Meta meta;
         // Copy the value.
-        std::memcpy(&(*result), value.data(), value.size());
+        std::memcpy(&meta, value.data(), value.size());
 
-        return result;
+        return std::optional<Value>(std::in_place_t(), meta);
     }
     // Unsuported size of the value.
     return {};

@@ -4,6 +4,9 @@
 
 namespace Vcs::Fs {
 
+/// Mutable file.
+#define S_MUTABLE (1u << 31)
+
 struct Meta {
     HashId id;
     /// Type and protection.

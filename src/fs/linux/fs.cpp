@@ -22,6 +22,37 @@ constexpr blkcnt_t CalculateBlockCount(const size_t size) noexcept {
     return ((size + (4096 - 1)) & ~(4096 - 1)) / 4096;
 }
 
+constexpr Meta MakeMeta(const PathEntry& e) noexcept {
+    Meta meta;
+
+    // Common attributes.
+    meta.id = e.id;
+    meta.size = e.size;
+    // Type of the entry.
+    switch (e.type) {
+        case PathType::Unknown:
+            break;
+        case PathType::File:
+            meta.mode = S_IFREG | 0644;
+            break;
+        case PathType::Directory:
+            meta.mode = S_IFDIR | 0755;
+            meta.size = 4096;
+            break;
+        case PathType::Executible:
+            meta.mode = S_IFREG | 0644 | S_IXUSR | S_IXGRP | S_IXOTH;
+            break;
+        case PathType::Symlink:
+            meta.mode = S_IFLNK | 0755;
+            break;
+    }
+    // Timestamps.
+    meta.ctime = timespec();
+    meta.mtime = timespec();
+
+    return meta;
+}
+
 } // namespace
 
 Filesystem::Filesystem(const MountOptions& options)
@@ -40,17 +71,72 @@ Filesystem::Filesystem(const MountOptions& options)
 
 Filesystem::~Filesystem() = default;
 
-int Filesystem::GetAttr(const std::string_view path, struct stat* st, fuse_file_info*) {
+int Filesystem::GetAttr(const std::string_view path, struct stat* st, fuse_file_info* fi) {
+    auto setup_from_meta = [this](const Meta& meta, struct stat* st) {
+        std::memset(st, 0, sizeof(struct stat));
+        // Common attributes.
+        st->st_mode = meta.mode;
+        st->st_nlink = 1;
+        st->st_size = meta.size;
+        // Directory type.
+        if (S_ISDIR(meta.mode)) {
+            st->st_nlink = 2;
+            st->st_size = 4096;
+        }
+        // Clear internal flag.
+        st->st_mode = st->st_mode & ~S_MUTABLE;
+        // Timestamps.
+        st->st_ctim = meta.ctime;
+        st->st_mtim = meta.mtime;
+        st->st_atim = std::max(st->st_ctim, st->st_mtim);
+        // System-wide attributes.
+        st->st_gid = egid_;
+        st->st_uid = euid_;
+        st->st_blksize = 4096;
+        st->st_blocks = CalculateBlockCount(st->st_size);
+    };
+
+    if (fi) {
+        if (fi->fh) {
+            setup_from_meta(std::bit_cast<const BaseHandle*>(fi->fh)->meta, st);
+            return 0;
+        }
+    }
+
+    if (auto data = metabase_->GetMetadata(path)) {
+        // Tombstone.
+        if (data->index() == 0) {
+            return -ENOENT;
+        }
+        // Timestamps.
+        if (data->index() == 1) {
+            const Timestamps& ts = std::get<1>(*data);
+
+            if (const auto e = stage_.GetEntry(path)) {
+                SetupAttributes(*e, st);
+                // Timestamps.
+                st->st_ctim = ts.ctime;
+                st->st_mtim = ts.mtime;
+                st->st_atim = std::max(st->st_ctim, st->st_mtim);
+                return 0;
+            } else {
+                return -ENOENT;
+            }
+        }
+        // Full metadata.
+        if (data->index() == 2) {
+            setup_from_meta(std::get<2>(*data), st);
+            return 0;
+        }
+
+        return -ENOENT;
+    }
+
     if (const auto e = stage_.GetEntry(path)) {
         SetupAttributes(*e, st);
-
-        if (auto meta = metabase_->GetMetadata(path)) {
-            st->st_ctim = meta->ctime;
-            st->st_mtim = meta->mtime;
-            st->st_atim = std::max(st->st_ctim, st->st_mtim);
-        }
         return 0;
     }
+
     return -ENOENT;
 }
 
@@ -68,7 +154,7 @@ int Filesystem::Open(const std::string_view path, fuse_file_info* fi) {
         return -EISDIR;
     }
 
-    fi->fh = std::bit_cast<uint64_t>(new BlobHandle(blobs_.Load(e->id, e->data)));
+    fi->fh = std::bit_cast<uint64_t>(new BlobHandle(MakeMeta(*e), blobs_.Load(e->id, e->data)));
     fi->keep_cache = 1;
     fi->noflush = 1;
 
@@ -88,7 +174,7 @@ int Filesystem::OpenDir(const std::string_view path, fuse_file_info* fi) {
         return -ENOTDIR;
     }
 
-    fi->fh = std::bit_cast<uint64_t>(new DirectoryHandle(trees_.LoadTree(e->id)));
+    fi->fh = std::bit_cast<uint64_t>(new DirectoryHandle(MakeMeta(*e), trees_.LoadTree(e->id)));
     fi->cache_readdir = 1;
     fi->keep_cache = 1;
     fi->noflush = 1;
@@ -205,6 +291,8 @@ void Filesystem::SetupAttributes(const PathEntry& e, struct stat* st) const noex
             st->st_mode = S_IFLNK | 0755;
             break;
     }
+    // Clear internal flag.
+    st->st_mode = st->st_mode & ~S_MUTABLE;
     // Timestamps.
     st->st_ctim = root_time_;
     st->st_mtim = root_time_;
