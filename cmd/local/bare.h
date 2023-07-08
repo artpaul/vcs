@@ -71,6 +71,8 @@ struct WorkspaceInfo {
     std::string branch;
     /// Base of working tree.
     HashId tree;
+    /// Workspace with virtual working tree.
+    bool fuse = false;
 
     static WorkspaceInfo Load(const std::string_view data);
 
@@ -202,7 +204,7 @@ public:
     std::optional<WorkspaceInfo> GetWorkspace(const std::string& name) const;
 
     /** Lists registered workspaces. */
-    void ListWorkspaces(const std::function<const WorkspaceInfo&>& cb) const;
+    void ListWorkspaces(const std::function<void(const WorkspaceInfo&)>& cb) const;
 
     /**@}*/
 

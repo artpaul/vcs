@@ -23,6 +23,8 @@ enum class Action {
     Init,
     /// Show commit log.
     Log,
+    /// Mount virtual filesystem.
+    Mount,
     /// Manage set of tracked repositories.
     Remote,
     /// Remove files from the working tree.

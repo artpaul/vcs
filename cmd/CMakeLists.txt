@@ -23,6 +23,7 @@ target_sources(vcs-local PRIVATE
 target_link_libraries(vcs
     contrib-cxxopts
     contrib-subprocess
+    vcs-fs
     vcs-local
 )
 
@@ -44,6 +45,7 @@ target_sources(vcs PRIVATE
     "actions/git.cpp"
     "actions/init.cpp"
     "actions/log.cpp"
+    "actions/mount.cpp"
     "actions/remote.cpp"
     "actions/reset.cpp"
     "actions/restore.cpp"

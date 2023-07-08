@@ -14,6 +14,10 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "")
     set(CMAKE_BUILD_TYPE "Release")
 endif()
 
+if(UNIX AND NOT APPLE)
+    set(LINUX TRUE)
+endif()
+
 # Common flags.
 set(BUILD_SHARED_LIBS OFF)
 
@@ -56,6 +60,7 @@ endif()
 include_directories(.)
 
 add_subdirectory(cmd)
+add_subdirectory(src)
 add_subdirectory(vcs)
 add_subdirectory(util)
 

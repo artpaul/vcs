@@ -13,9 +13,12 @@ extern int ExecuteConfig(int argc, char* argv[], const std::function<Workspace&(
 extern int ExecuteDiff(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteDump(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteFetch(int argc, char* argv[], const std::function<Workspace&()>& cb);
-extern int ExecuteGit(int argc, char* argv[], const std::function<Workspace&(const Repository::Options&)>& cb);
+extern int ExecuteGit(
+    int argc, char* argv[], const std::function<Workspace&(const Repository::Options&)>& cb
+);
 extern int ExecuteInit(int argc, char* argv[]);
 extern int ExecuteLog(int argc, char* argv[], const std::function<Workspace&()>& cb);
+extern int ExecuteMount(int argc, char* argv[]);
 extern int ExecuteRemote(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteReset(int argc, char* argv[], const std::function<Workspace&()>& cb);
 extern int ExecuteRestore(int argc, char* argv[], const std::function<Workspace&()>& cb);
@@ -165,6 +168,8 @@ int Main(int argc, char* argv[]) {
             return ExecuteInit(argc, argv);
         case Action::Log:
             return ExecuteLog(argc, argv, get_workspace_read_only);
+        case Action::Mount:
+            return ExecuteMount(argc, argv);
         case Action::Remote:
             return ExecuteRemote(argc, argv, get_workspace);
         case Action::Remove:

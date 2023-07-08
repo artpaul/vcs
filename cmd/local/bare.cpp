@@ -66,7 +66,12 @@ auto RemoteInfo::Save(const RemoteInfo& rec) -> std::string {
 auto WorkspaceInfo::Load(const std::string_view data) -> WorkspaceInfo {
     auto json = nlohmann::json::parse(data);
 
-    return WorkspaceInfo{.name = json["name"].get<std::string>(), .path = json["path"].get<std::string>()};
+    WorkspaceInfo info;
+    info.name = json["name"].get<std::string>();
+    info.path = json["path"].get<std::string>();
+    info.fuse = json.value("fuse", false);
+
+    return info;
 }
 
 auto WorkspaceInfo::Save(const WorkspaceInfo& rec) -> std::string {
@@ -74,6 +79,7 @@ auto WorkspaceInfo::Save(const WorkspaceInfo& rec) -> std::string {
 
     json["name"] = rec.name;
     json["path"] = rec.path.string();
+    json["fuse"] = rec.fuse;
 
     return json.dump();
 }
@@ -357,6 +363,30 @@ std::optional<WorkspaceInfo> Repository::GetWorkspace(const std::string& name) c
     }
 
     return std::nullopt;
+}
+
+void Repository::ListWorkspaces(const std::function<void(const WorkspaceInfo&)>& cb) const {
+    if (!cb) {
+        return;
+    }
+
+    workspaces_->Enumerate([&](const std::string_view, WorkspaceInfo info) {
+        const auto state_path = layout_.Workspace(info.name);
+
+        info.branch = StringFromFile(state_path / "HEAD");
+
+        if (info.fuse) {
+            info.tree = HashId::FromHex(StringFromFile(state_path / "TREE"));
+        } else {
+            if (const auto branch = branches_->Get(info.branch)) {
+                info.tree = branch->head ? odb_.LoadCommit(branch->head).Tree() : HashId();
+            }
+        }
+
+        cb(info);
+
+        return true;
+    });
 }
 
 Datastore Repository::OpenObjects(const Options& options) {
