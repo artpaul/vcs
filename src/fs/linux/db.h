@@ -21,6 +21,8 @@ public:
 
     std::optional<Value> GetMetadata(const std::string_view path) const;
 
+    bool PutMeta(const std::string_view path, const Meta& meta);
+
     bool PutTimestamps(const std::string_view path, const Timestamps& ts);
 
 private:

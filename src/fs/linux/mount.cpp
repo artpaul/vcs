@@ -45,6 +45,10 @@ static void FsDestory(void*) {
     gFs.reset();
 }
 
+static int FsChmod(const char* path, mode_t mode, struct fuse_file_info* fi) {
+    return Invoke(&Filesystem::Chmod, path ? std::string_view(path + 1) : std::string_view(), mode, fi);
+}
+
 static int FsGetAttr(const char* path, struct stat* st, struct fuse_file_info* fi) {
     return Invoke(&Filesystem::GetAttr, path ? std::string_view(path + 1) : std::string_view(), st, fi);
 }
@@ -97,6 +101,7 @@ int MountWorktree(const MountOptions& options) {
 
     ops.init = FsInit;
     ops.destroy = FsDestory;
+    ops.chmod = FsChmod;
     ops.getattr = FsGetAttr;
     ops.open = FsOpen;
     ops.opendir = FsOpenDir;

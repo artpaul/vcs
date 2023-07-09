@@ -71,6 +71,50 @@ Filesystem::Filesystem(const MountOptions& options)
 
 Filesystem::~Filesystem() = default;
 
+int Filesystem::Chmod(const std::string_view path, mode_t mode, fuse_file_info* fi) {
+    if (fi) {
+        if (fi->fh) {
+            ;
+        }
+    }
+
+    if (const auto e = stage_.GetEntry(path)) {
+        Meta meta = MakeMeta(*e);
+
+        if (auto data = metabase_->GetMetadata(path)) {
+            // Tombstone.
+            if (data->index() == 0) {
+                meta.ctime = root_time_;
+                meta.mtime = root_time_;
+            }
+            // Timestamps.
+            if (data->index() == 1) {
+                const Timestamps& ts = std::get<1>(*data);
+
+                meta.ctime = ts.ctime;
+                meta.mtime = ts.mtime;
+            }
+            // Full metadata.
+            if (data->index() == 2) {
+                meta = std::get<2>(*data);
+            }
+        } else {
+            meta.ctime = root_time_;
+            meta.mtime = root_time_;
+        }
+
+        // Update permissions.
+        meta.mode = (meta.mode & ~ALLPERMS) | (mode & ALLPERMS);
+
+        // Save metadata.
+        metabase_->PutMeta(path, meta);
+
+        return 0;
+    }
+
+    return -ENOENT;
+}
+
 int Filesystem::GetAttr(const std::string_view path, struct stat* st, fuse_file_info* fi) {
     auto setup_from_meta = [this](const Meta& meta, struct stat* st) {
         std::memset(st, 0, sizeof(struct stat));

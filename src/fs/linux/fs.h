@@ -53,6 +53,8 @@ public:
     ~Filesystem();
 
 public:
+    int Chmod(const std::string_view path, mode_t mode, fuse_file_info* fi);
+
     int GetAttr(const std::string_view path, struct stat*, fuse_file_info*);
 
     int Open(const std::string_view path, fuse_file_info* fi);

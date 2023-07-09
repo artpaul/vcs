@@ -57,6 +57,12 @@ auto Metabase::GetMetadata(const std::string_view path) const -> std::optional<V
     return {};
 }
 
+bool Metabase::PutMeta(const std::string_view path, const Meta& meta) {
+    return db_
+        ->Put(WriteOptions(), Slice(path.data(), path.size()), Slice((const char*)&meta, sizeof(meta)))
+        .ok();
+}
+
 bool Metabase::PutTimestamps(const std::string_view path, const Timestamps& ts) {
     return db_->Put(WriteOptions(), Slice(path.data(), path.size()), Slice((const char*)&ts, sizeof(ts)))
         .ok();
