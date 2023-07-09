@@ -8,7 +8,10 @@
 
 #include <contrib/libfuse/include/fuse.h>
 
+#include <map>
+#include <mutex>
 #include <optional>
+#include <shared_mutex>
 
 namespace Vcs::Fs {
 
@@ -47,6 +50,29 @@ struct DirectoryHandle : BaseHandle {
  * Virtual filesystem for working tree.
  */
 class Filesystem {
+    struct Directory {
+        enum class State {
+            Virtual = 0,
+            Deleted = 1,
+            Mutable = 2,
+        };
+
+        struct Entry {
+            Meta meta;
+            State state = State::Virtual;
+            std::shared_ptr<Directory> directory;
+        };
+
+        std::mutex mutex;
+        std::map<std::string, Entry, std::less<>> entries;
+
+        static std::shared_ptr<Directory> MakeEmpty();
+
+        static std::shared_ptr<Directory> MakeFromTree(const Tree& tree);
+    };
+
+    using DirectoryPtr = std::shared_ptr<Directory>;
+
 public:
     explicit Filesystem(const MountOptions& options);
 
@@ -56,6 +82,8 @@ public:
     int Chmod(const std::string_view path, mode_t mode, fuse_file_info* fi);
 
     int GetAttr(const std::string_view path, struct stat*, fuse_file_info*);
+
+    int Mkdir(const std::string_view path, mode_t mode);
 
     int Open(const std::string_view path, fuse_file_info* fi);
 
@@ -76,6 +104,8 @@ public:
 private:
     Meta GetActualMetadata(const std::string_view path, const PathEntry& e) const;
 
+    DirectoryPtr GetMutableParentNoLock(const std::vector<std::string_view>& parts);
+
     void SetupAttributes(const PathEntry& e, struct stat* st) const noexcept;
 
 private:
@@ -84,6 +114,9 @@ private:
     Datastore trees_;
     StageArea stage_;
     HashId tree_;
+
+    std::shared_mutex root_mutex_;
+    DirectoryPtr root_;
     timespec root_time_;
 
     std::unique_ptr<Metabase> metabase_;

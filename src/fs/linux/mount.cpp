@@ -53,6 +53,10 @@ static int FsGetAttr(const char* path, struct stat* st, struct fuse_file_info* f
     return Invoke(&Filesystem::GetAttr, path ? std::string_view(path + 1) : std::string_view(), st, fi);
 }
 
+static int FsMkdir(const char* path, mode_t mode) {
+    return Invoke(&Filesystem::Mkdir, path ? std::string_view(path + 1) : std::string_view(), mode);
+}
+
 static int FsOpen(const char* path, struct fuse_file_info* fi) {
     return Invoke(&Filesystem::Open, std::string_view(path + 1), fi);
 }
@@ -103,6 +107,7 @@ int MountWorktree(const MountOptions& options) {
     ops.destroy = FsDestory;
     ops.chmod = FsChmod;
     ops.getattr = FsGetAttr;
+    ops.mkdir = FsMkdir;
     ops.open = FsOpen;
     ops.opendir = FsOpenDir;
     ops.read = FsRead;

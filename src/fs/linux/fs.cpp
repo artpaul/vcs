@@ -4,6 +4,8 @@
 #include <cmd/local/bare.h>
 #include <vcs/store/memory.h>
 
+#include <util/split.h>
+
 #include <contrib/fmt/fmt/format.h>
 #include <contrib/libfuse/include/fuse.h>
 
@@ -55,6 +57,22 @@ constexpr Meta MakeMeta(const PathEntry& e) noexcept {
 
 } // namespace
 
+auto Filesystem::Directory::MakeEmpty() -> std::shared_ptr<Directory> {
+    return std::make_shared<Directory>();
+}
+
+auto Filesystem::Directory::MakeFromTree(const Tree& tree) -> std::shared_ptr<Directory> {
+    auto dir = std::make_shared<Directory>();
+
+    for (const auto& e : tree.Entries()) {
+        auto ei = dir->entries.emplace_hint(dir->entries.end(), e.Name(), Directory::Entry());
+
+        ei->second.meta = MakeMeta(static_cast<PathEntry>(e));
+    }
+
+    return dir;
+}
+
 Filesystem::Filesystem(const MountOptions& options)
     : odb_(options.repository->Objects())
     , blobs_(odb_.Cache(Store::MemoryCache<>::Make()))
@@ -64,6 +82,8 @@ Filesystem::Filesystem(const MountOptions& options)
     root_time_ = timespec{.tv_sec = std::time(nullptr), .tv_nsec = 0};
 
     metabase_ = std::make_unique<Metabase>((options.state_path / "meta").string());
+
+    root_ = tree_ ? Directory::MakeFromTree(trees_.LoadTree(tree_)) : Directory::MakeEmpty();
 
     euid_ = geteuid();
     egid_ = getegid();
@@ -182,6 +202,37 @@ int Filesystem::GetAttr(const std::string_view path, struct stat* st, fuse_file_
     }
 
     return -ENOENT;
+}
+
+int Filesystem::Mkdir(const std::string_view path, mode_t mode) {
+    const auto& parts = SplitPath(path);
+    std::shared_lock lock(root_mutex_);
+
+    if (auto parent = GetMutableParentNoLock(parts)) {
+        std::lock_guard lock(parent->mutex);
+
+        auto ei = parent->entries.find(parts.back());
+        // Check for existence and insert an entry.
+        if (ei == parent->entries.end()) {
+            ei = parent->entries.emplace(parts.back(), Directory::Entry()).first;
+        } else if (ei->second.state != Directory::State::Deleted) {
+            return -EEXIST;
+        }
+        // Setup the entry.
+        ei->second.meta.id = HashId();
+        ei->second.meta.mode = S_MUTABLE | S_IFDIR | (mode & ~ALLPERMS);
+        ei->second.meta.size = 0;
+        ei->second.meta.ctime = timespec{.tv_sec = time(0), .tv_nsec = 0};
+        ei->second.meta.mtime = ei->second.meta.ctime;
+        ei->second.directory = nullptr;
+
+        // Save metadata.
+        metabase_->PutMeta(path, ei->second.meta);
+        // TODO: save parent.
+        return 0;
+    } else {
+        return -ENOTDIR;
+    }
 }
 
 int Filesystem::Open(const std::string_view path, fuse_file_info* fi) {
@@ -309,6 +360,41 @@ int Filesystem::StatFs(struct statvfs* fs) {
     fs->f_bsize = 4096;
     fs->f_namemax = 255;
     return 0;
+}
+
+auto Filesystem::GetMutableParentNoLock(const std::vector<std::string_view>& parts) -> DirectoryPtr {
+    DirectoryPtr parent = root_;
+
+    if (parts.empty() || parts.size() == 1) {
+        return parent;
+    }
+
+    for (size_t i = 0, end = parts.size() - 1; i != end; ++i) {
+        std::unique_lock lock(parent->mutex);
+
+        if (auto ei = parent->entries.find(parts[i]); ei != parent->entries.end()) {
+            auto& entry = ei->second;
+            // The node is not a directory or was deleted.
+            if (!S_ISDIR(entry.meta.mode) || entry.state == Directory::State::Deleted) {
+                return nullptr;
+            }
+            if (!entry.directory) {
+                if (entry.meta.id) {
+                    entry.directory = Directory::MakeFromTree(trees_.LoadTree(entry.meta.id));
+                } else {
+                    entry.directory = Directory::MakeEmpty();
+                }
+            }
+            if (auto d = entry.directory) {
+                lock.unlock();
+                parent = std::move(d);
+            }
+        } else {
+            return {};
+        }
+    }
+
+    return parent;
 }
 
 void Filesystem::SetupAttributes(const PathEntry& e, struct stat* st) const noexcept {
