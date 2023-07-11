@@ -92,6 +92,10 @@ static int FsReleaseDir(const char*, struct fuse_file_info* fi) {
     return Invoke(&Filesystem::ReleaseDir, fi);
 }
 
+static int FsRmdir(const char* path) {
+    return Invoke(&Filesystem::Rmdir, std::string_view(path + 1));
+}
+
 static int FsStatFs(const char*, struct statvfs* fs) {
     return Invoke(&Filesystem::StatFs, fs);
 }
@@ -115,6 +119,7 @@ int MountWorktree(const MountOptions& options) {
     ops.readlink = FsReadLink;
     ops.release = FsRelease;
     ops.releasedir = FsReleaseDir;
+    ops.rmdir = FsRmdir;
     ops.statfs = FsStatFs;
 
     // Don't mask creation mode, kernel already did that.

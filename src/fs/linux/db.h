@@ -26,6 +26,8 @@ public:
 
     void Enumerate(const std::function<void(std::string_view, const Value&)>& on_record) const;
 
+    bool PutDelete(const std::string_view path);
+
     bool PutMeta(const std::string_view path, const Meta& meta);
 
     bool PutTimestamps(const std::string_view path, const Timestamps& ts);

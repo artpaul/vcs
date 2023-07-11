@@ -111,6 +111,10 @@ void Metabase::Enumerate(const std::function<void(std::string_view, const Value&
     }
 }
 
+bool Metabase::PutDelete(const std::string_view path) {
+    return db_->Put(WriteOptions(), Slice(path.data(), path.size()), Slice()).ok();
+}
+
 bool Metabase::PutMeta(const std::string_view path, const Meta& meta) {
     return db_
         ->Put(WriteOptions(), Slice(path.data(), path.size()), Slice((const char*)&meta, sizeof(meta)))

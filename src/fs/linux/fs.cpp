@@ -576,6 +576,30 @@ int Filesystem::ReleaseDir(struct fuse_file_info* fi) {
     return 0;
 }
 
+int Filesystem::Rmdir(const std::string_view path) {
+    const auto& parts = SplitPath(path);
+    std::shared_lock lock(root_mutex_);
+
+    if (auto parent = GetMutableParentNoLock(parts)) {
+        std::lock_guard lock(parent->mutex);
+
+        auto ei = parent->entries.find(parts.back());
+        // Check for existence and insert an entry.
+        if (ei == parent->entries.end() || ei->second.state == Directory::State::Deleted) {
+            return -ENOENT;
+        }
+        // Setup the entry.
+        parent->entries.erase(ei);
+
+        // Save metadata.
+        metabase_->PutDelete(path);
+        // TODO: save parent.
+        return 0;
+    } else {
+        return -ENOTDIR;
+    }
+}
+
 int Filesystem::StatFs(struct statvfs* fs) {
     fs->f_flag = ST_NOATIME;
     fs->f_bsize = 4096;

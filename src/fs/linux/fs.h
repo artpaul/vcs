@@ -105,6 +105,8 @@ public:
 
     int ReleaseDir(struct fuse_file_info* fi);
 
+    int Rmdir(const std::string_view path);
+
     int StatFs(struct statvfs* fs);
 
 private:
