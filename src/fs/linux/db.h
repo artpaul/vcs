@@ -4,6 +4,7 @@
 
 #include <contrib/leveldb/include/leveldb/db.h>
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string_view>
@@ -19,7 +20,11 @@ public:
 
     ~Metabase();
 
+    void Delete(const std::vector<std::string>& keys);
+
     std::optional<Value> GetMetadata(const std::string_view path) const;
+
+    void Enumerate(const std::function<void(std::string_view, const Value&)>& on_record) const;
 
     bool PutMeta(const std::string_view path, const Meta& meta);
 

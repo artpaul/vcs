@@ -40,6 +40,14 @@ public:
     std::optional<PathEntry> GetEntry(const std::string_view path, bool removed = false) const;
 
     /**
+     * Returns value of the entry.
+     *
+     * @param removed return entry even if it mareked as removed.
+     */
+    std::optional<PathEntry> GetEntry(const std::vector<std::string_view>& parts, bool removed = false)
+        const;
+
+    /**
      * @param removed return entry info even if it mareked as removed.
      */
     std::vector<std::pair<std::string, PathEntry>> ListTree(

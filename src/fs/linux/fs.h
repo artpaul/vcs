@@ -12,39 +12,11 @@
 #include <mutex>
 #include <optional>
 #include <shared_mutex>
+#include <variant>
 
 namespace Vcs::Fs {
 
 class Metabase;
-
-struct BaseHandle {
-    Meta meta;
-
-    explicit BaseHandle(const Meta& m) noexcept
-        : meta(m) {
-    }
-};
-
-struct BlobHandle : BaseHandle {
-    /// Flags which the file was opened with.
-    const int flags = 0;
-    /// Handle of an immutable blob object.
-    std::optional<Object> blob;
-
-    explicit BlobHandle(const Meta& m, Object obj) noexcept
-        : BaseHandle(m)
-        , blob(std::move(obj)) {
-    }
-};
-
-struct DirectoryHandle : BaseHandle {
-    Tree tree;
-
-    explicit DirectoryHandle(const Meta& m, Tree obj) noexcept
-        : BaseHandle(m)
-        , tree(std::move(obj)) {
-    }
-};
 
 /**
  * Virtual filesystem for working tree.
@@ -68,7 +40,41 @@ class Filesystem {
 
         static std::shared_ptr<Directory> MakeEmpty();
 
-        static std::shared_ptr<Directory> MakeFromTree(const Tree& tree);
+        static std::shared_ptr<Directory> MakeFromTree(const Tree& tree, const Timestamps& ts);
+    };
+
+    struct BaseHandle {
+        Meta meta;
+
+        explicit BaseHandle(const Meta& m) noexcept
+            : meta(m) {
+        }
+    };
+
+    struct BlobHandle : BaseHandle {
+        /// Flags which the file was opened with.
+        const int flags = 0;
+        /// Handle of an immutable blob object.
+        std::optional<Object> blob;
+
+        explicit BlobHandle(const Meta& m, Object obj) noexcept
+            : BaseHandle(m)
+            , blob(std::move(obj)) {
+        }
+    };
+
+    struct DirectoryHandle : BaseHandle {
+        std::variant<Tree, std::map<std::string, Directory::Entry, std::less<>>> entries;
+
+        DirectoryHandle(const Meta& m, Tree obj) noexcept
+            : BaseHandle(m)
+            , entries(std::move(obj)) {
+        }
+
+        DirectoryHandle(const Meta& m, std::map<std::string, Directory::Entry, std::less<>> obj)
+            : BaseHandle(m)
+            , entries(std::move(obj)) {
+        }
     };
 
     using DirectoryPtr = std::shared_ptr<Directory>;
@@ -105,6 +111,8 @@ private:
     Meta GetActualMetadata(const std::string_view path, const PathEntry& e) const;
 
     DirectoryPtr GetMutableParentNoLock(const std::vector<std::string_view>& parts);
+
+    void LoadSate();
 
     void SetupAttributes(const PathEntry& e, struct stat* st) const noexcept;
 

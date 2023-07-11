@@ -1,9 +1,11 @@
 #include "db.h"
 
 #include <contrib/fmt/fmt/format.h>
+#include <contrib/leveldb/include/leveldb/write_batch.h>
 
 namespace Vcs::Fs {
 
+using leveldb::Iterator;
 using leveldb::ReadOptions;
 using leveldb::Slice;
 using leveldb::WriteOptions;
@@ -23,6 +25,19 @@ Metabase::Metabase(const std::string& path)
 
 Metabase::~Metabase() {
     delete db_;
+}
+
+void Metabase::Delete(const std::vector<std::string>& keys) {
+    leveldb::WriteBatch batch;
+
+    if (keys.empty()) {
+        return;
+    }
+    for (const auto& key : keys) {
+        batch.Delete(Slice(key.data(), key.size()));
+    }
+
+    db_->Write(WriteOptions(), &batch);
 }
 
 auto Metabase::GetMetadata(const std::string_view path) const -> std::optional<Value> {
@@ -55,6 +70,45 @@ auto Metabase::GetMetadata(const std::string_view path) const -> std::optional<V
     }
     // Unsuported size of the value.
     return {};
+}
+
+void Metabase::Enumerate(const std::function<void(std::string_view, const Value&)>& on_record) const {
+    auto snapshot = db_->GetSnapshot();
+
+    try {
+        std::unique_ptr<Iterator> it(db_->NewIterator(ReadOptions{.snapshot = snapshot}));
+
+        for (it->SeekToFirst(); it->Valid(); it->Next()) {
+            const auto key = it->key();
+            const auto value = it->value();
+
+            // An empty value represents a tombstone marker.
+            if (value.empty()) {
+                on_record(std::string_view(key.data(), key.size()), Value());
+            }
+            // The value stores just timestamps.
+            if (value.size() == sizeof(Timestamps)) {
+                Timestamps ts;
+                // Copy the value.
+                std::memcpy(&ts, value.data(), value.size());
+
+                on_record(std::string_view(key.data(), key.size()), ts);
+            }
+            // The value stores the full metadata.
+            if (value.size() == sizeof(Meta)) {
+                Meta meta;
+                // Copy the value.
+                std::memcpy(&meta, value.data(), value.size());
+
+                on_record(std::string_view(key.data(), key.size()), meta);
+            }
+        }
+
+        db_->ReleaseSnapshot(snapshot);
+    } catch (...) {
+        db_->ReleaseSnapshot(snapshot);
+        throw;
+    }
 }
 
 bool Metabase::PutMeta(const std::string_view path, const Meta& meta) {

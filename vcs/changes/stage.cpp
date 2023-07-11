@@ -164,8 +164,11 @@ bool StageArea::Copy(const std::string& src, const std::string& dst) {
 }
 
 std::optional<PathEntry> StageArea::GetEntry(const std::string_view path, bool removed) const {
-    const auto& parts = SplitPath(path);
+    return GetEntry(SplitPath(path), removed);
+}
 
+std::optional<PathEntry> StageArea::GetEntry(const std::vector<std::string_view>& parts, bool removed)
+    const {
     if (parts.empty() || !stage_root_) {
         if (tree_id_) {
             return GetPathEntry(tree_id_, parts);
