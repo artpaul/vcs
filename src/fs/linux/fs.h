@@ -23,15 +23,8 @@ class Metabase;
  */
 class Filesystem {
     struct Directory {
-        enum class State {
-            Virtual = 0,
-            Deleted = 1,
-            Mutable = 2,
-        };
-
         struct Entry {
             Meta meta;
-            State state = State::Virtual;
             std::shared_ptr<Directory> directory;
         };
 
@@ -112,7 +105,7 @@ public:
 private:
     Meta GetActualMetadata(const std::string_view path, const PathEntry& e) const;
 
-    DirectoryPtr GetMutableParentNoLock(const std::vector<std::string_view>& parts);
+    DirectoryPtr GetMutableParentNoLock(const std::vector<std::string_view>& parts, bool materialize);
 
     void LoadSate();
 
@@ -124,6 +117,7 @@ private:
     Datastore trees_;
     StageArea stage_;
     HashId tree_;
+    std::filesystem::path mutable_path_;
 
     std::shared_mutex root_mutex_;
     DirectoryPtr root_;

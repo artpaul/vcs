@@ -485,7 +485,7 @@ void WorkingTree::Status(const StatusOptions& options, const StageArea& stage, c
         }
     };
 
-    DirectoryIterator di(path_.string());
+    DirectoryIterator di(path_);
 
     index_->Start();
     state.emplace_back(std::string(), stage.ListTree(std::string()));
