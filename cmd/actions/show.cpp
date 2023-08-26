@@ -177,16 +177,18 @@ int ShowCommit(const Options& options, const Commit& commit, const Datastore& od
 }
 
 int Execute(const Options& options, const Workspace& repo) {
-    const auto obj = repo.Objects().Load(options.id);
+    const auto& odb = repo.Objects();
 
     SetupPager(repo.GetConfig());
 
-    switch (obj.Type()) {
+    switch (odb.GetType(options.id)) {
         case DataType::Blob:
-            return ShowBlob(obj.AsBlob());
+        case DataType::BlobIndex:
+            return ShowBlob(odb.LoadBlob(options.id));
         case DataType::Commit:
-            return ShowCommit(options, obj.AsCommit(), repo.Objects());
-        case DataType::Index:
+            return ShowCommit(options, odb.LoadCommit(options.id), odb);
+        case DataType::TreeIndex:
+        case DataType::RenamesIndex:
             return 1;
         case DataType::Tree:
         case DataType::Tag:

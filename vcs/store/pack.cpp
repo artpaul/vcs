@@ -801,14 +801,14 @@ Object Leveled::PackTable::Load(const HashId& id, const DataType expected) const
 
     if (parts.empty()) {
         // Type mismatch.
-        if (expected != DataType::None && base.Type() != expected && base.Type() != DataType::Index) {
+        if (Datastore::IsUnexpected(base.Type(), expected)) {
             return Object();
         }
         return base;
     } else {
         const DataHeader hdr = std::get<0>(parts[0])->Meta();
         // Type mismatch.
-        if (expected != DataType::None && hdr.Type() != expected && hdr.Type() != DataType::Index) {
+        if (Datastore::IsUnexpected(hdr.Type(), expected)) {
             return Object();
         }
     }

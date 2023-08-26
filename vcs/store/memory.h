@@ -64,9 +64,7 @@ protected:
 
         if (auto oi = objects_.find(id); oi != objects_.end()) {
             // Type mismatch.
-            if ((expected != DataType::None) && (oi->second->second.Type() != expected)
-                && (oi->second->second.Type() != DataType::Index))
-            {
+            if (Datastore::IsUnexpected(oi->second->second.Type(), expected)) {
                 return Object();
             }
             list_.splice(list_.end(), list_, oi->second);

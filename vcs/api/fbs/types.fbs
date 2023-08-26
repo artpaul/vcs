@@ -22,8 +22,14 @@ enum DataType : uint8 {
     /// Tag object.
     Tag = 5,
 
-    /// Index object.
-    Index = 15,
+    /// Index for content object.
+    BlobIndex = 9,
+
+    /// Index for tree object.
+    TreeIndex = 10,
+
+    /// Index for history adjustment object.
+    RenamesIndex = 12,
 }
 
 table Attribute {

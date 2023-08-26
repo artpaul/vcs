@@ -41,6 +41,12 @@ TEST(Object, Load) {
     EXPECT_EQ(std::string_view((const char*)obj.Data(), obj.Size()), kFileContent);
     // As blob object.
     EXPECT_EQ(obj.AsBlob(), kFileContent);
+
+    // Other type casts should throw.
+    EXPECT_ANY_THROW(obj.AsCommit());
+    EXPECT_ANY_THROW(obj.AsIndex());
+    EXPECT_ANY_THROW(obj.AsRenames());
+    EXPECT_ANY_THROW(obj.AsTree());
 }
 
 TEST(ObjectCommit, Parents) {
@@ -79,7 +85,7 @@ TEST(ObjectIndex, Parts) {
     const auto id = HashId::Make(DataType::Blob, "");
     const auto data = IndexBuilder(id, DataType::Blob).Append(HashId(), 5).Append(HashId(), 7).Serialize();
     const auto item = Fbs::GetIndex(data.data());
-    const auto index = Object::Load(DataType::Index, data).AsIndex();
+    const auto index = Object::Load(DataType::BlobIndex, data).AsIndex();
 
     /// Serialized form.
     EXPECT_EQ(FromFlatBuffers(item->id()), id);

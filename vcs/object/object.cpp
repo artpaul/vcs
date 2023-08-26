@@ -32,12 +32,12 @@ struct Adaptor {
 static_assert(sizeof(Adaptor::Tag) == 8);
 
 /// Checks that the object may be treated as it has the given type.
-template <DataType Type, size_t Length>
+template <typename F, size_t Length>
 static void ValidateTypecast(const std::shared_ptr<std::byte[]>& data, const char (&name)[Length]) {
     if (!data) {
         throw std::runtime_error(fmt::format(FMT_COMPILE("cannot convert null object to a {}"), name));
     }
-    if (DataType(Adaptor::GetTag(data.get())->type) != Type) {
+    if (!F()(DataType(Adaptor::GetTag(data.get())->type))) {
         throw std::runtime_error(fmt::format(FMT_COMPILE("object not a {}"), name));
     }
 }
@@ -74,27 +74,27 @@ Object Object::Load(const DataHeader header, const std::function<void(std::byte*
 }
 
 Blob Object::AsBlob() const {
-    ValidateTypecast<DataType::Blob>(data_, "blob");
+    ValidateTypecast<decltype([](DataType t) { return t == DataType::Blob; })>(data_, "blob");
     return Blob(data_);
 }
 
 Commit Object::AsCommit() const {
-    ValidateTypecast<DataType::Commit>(data_, "commit");
+    ValidateTypecast<decltype([](DataType t) { return t == DataType::Commit; })>(data_, "commit");
     return Commit(data_);
 }
 
 Index Object::AsIndex() const {
-    ValidateTypecast<DataType::Index>(data_, "index");
+    ValidateTypecast<decltype([](DataType t) { return t.IsIndex(); })>(data_, "index");
     return Index(data_);
 }
 
 Renames Object::AsRenames() const {
-    ValidateTypecast<DataType::Renames>(data_, "renames");
+    ValidateTypecast<decltype([](DataType t) { return t == DataType::Renames; })>(data_, "renames");
     return Renames(data_);
 }
 
 Tree Object::AsTree() const {
-    ValidateTypecast<DataType::Tree>(data_, "tree");
+    ValidateTypecast<decltype([](DataType t) { return t == DataType::Tree; })>(data_, "tree");
     return Tree(data_);
 }
 
@@ -107,7 +107,7 @@ uint64_t Object::Size() const noexcept {
 }
 
 DataType Object::Type() const noexcept {
-    return data_ ? DataType(Adaptor::GetTag(data_.get())->type) : DataType::None;
+    return data_ ? DataType(Adaptor::GetTag(data_.get())->type) : DataType(DataType::None);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -297,7 +297,7 @@ uint64_t Index::Size() const {
 }
 
 DataType Index::Type() const {
-    return DataType(Fbs::GetIndex(Adaptor::GetData(data_.get()))->type());
+    return DataType(uint8_t(Fbs::GetIndex(Adaptor::GetData(data_.get()))->type()));
 }
 
 RepeatedField<Index::Part, Index::RangeParts> Index::Parts() const {
@@ -410,7 +410,7 @@ HashId Tree::Entry::Id() const {
 }
 
 DataType Tree::Entry::Data() const {
-    return DataType(static_cast<const Fbs::TreeEntry*>(p_)->data());
+    return DataType(uint8_t(static_cast<const Fbs::TreeEntry*>(p_)->data()));
 }
 
 std::string_view Tree::Entry::Name() const {
@@ -434,7 +434,7 @@ Tree::Entry::operator PathEntry() const {
 
     return PathEntry{
         .id = bool(id) ? HashId::FromBytes(id->data(), id->size()) : HashId(),
-        .data = DataType(te->data()),
+        .data = DataType(uint8_t(te->data())),
         .type = PathType(te->type()),
         .size = te->size(),
     };

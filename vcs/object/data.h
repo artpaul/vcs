@@ -18,20 +18,73 @@ enum class Compression : uint8_t {
 /**
  * Types of data objects.
  */
-enum class DataType : uint8_t {
-    None = 0,
-    /// Content object.
-    Blob = 1,
-    /// Tree object.
-    Tree = 2,
-    /// Commit object.
-    Commit = 3,
-    /// History adjustment object.
-    Renames = 4,
-    /// Tag object.
-    Tag = 5,
-    /// Index object.
-    Index = 15,
+class DataType {
+public:
+    enum E : uint8_t {
+        None = 0,
+
+        /// Content object.
+        Blob = 1,
+        /// Tree object.
+        Tree = 2,
+        /// Commit object.
+        Commit = 3,
+        /// History adjustment object.
+        Renames = 4,
+        /// Tag object.
+        Tag = 5,
+
+        /// Index for content object.
+        BlobIndex = Blob + 8,
+        /// Index for tree object.
+        TreeIndex = Tree + 8,
+        /// Index for history adjustment object.
+        RenamesIndex = Renames + 8,
+    };
+
+    constexpr DataType() noexcept {
+    }
+
+    constexpr DataType(const E e) noexcept
+        : value_(e) {
+    }
+
+    explicit constexpr DataType(const uint8_t v) noexcept
+        : value_(E(v)) {
+    }
+
+public:
+    constexpr bool operator==(const DataType other) const noexcept {
+        return value_ == other.value_;
+    }
+
+    constexpr bool operator==(const DataType::E e) const noexcept {
+        return value_ == e;
+    }
+
+    constexpr explicit operator uint8_t() const noexcept {
+        return uint8_t(value_);
+    }
+
+    constexpr operator E() const noexcept {
+        return value_;
+    }
+
+public:
+    constexpr DataType CoreType() const noexcept {
+        return DataType(E(static_cast<std::underlying_type_t<E>>(value_) & 0x07));
+    }
+
+    constexpr bool IsIndex() const noexcept {
+        return static_cast<std::underlying_type_t<E>>(value_) & 0x08;
+    }
+
+    constexpr DataType ToIndex() const noexcept {
+        return DataType(E(static_cast<std::underlying_type_t<E>>(value_) | 0x08));
+    }
+
+private:
+    E value_;
 };
 
 /**
@@ -51,6 +104,7 @@ public:
             uint8_t tag;
             uint8_t size[7];
         };
+
         uint8_t data[8];
     };
 

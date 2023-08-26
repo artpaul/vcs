@@ -121,7 +121,7 @@ std::string IndexBuilder::Serialize() const {
 
     assert(bool(id_));
     assert(type_ != DataType::None);
-    assert(type_ != DataType::Index);
+    assert(!type_.IsIndex());
 
     const auto id = fbb.CreateVector(id_.Data(), id_.Size());
 
@@ -132,7 +132,7 @@ std::string IndexBuilder::Serialize() const {
         parts.push_back(Fbs::CreatePart(fbb, pi, part.size));
     }
 
-    fbb.Finish(Fbs::CreateIndex(fbb, id, Fbs::DataType(type_), fbb.CreateVector(parts)));
+    fbb.Finish(Fbs::CreateIndex(fbb, id, Fbs::DataType(uint8_t(type_)), fbb.CreateVector(parts)));
 
     return std::string((const char*)fbb.GetBufferPointer(), fbb.GetSize());
 }
@@ -258,7 +258,7 @@ std::string TreeBuilder::Serialize() {
         Fbs::TreeEntryBuilder builder(fbb);
 
         builder.add_id(id);
-        builder.add_data(Fbs::DataType(entry.data));
+        builder.add_data(Fbs::DataType(uint8_t(entry.data)));
         builder.add_type(Fbs::PathType(entry.type));
         builder.add_name(name);
         builder.add_size(entry.size);

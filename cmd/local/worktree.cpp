@@ -210,7 +210,7 @@ Modifications CompareBlobEntry(
             result.content = true;
         } else {
             const auto get_id = [&]() {
-                if (entry.data == DataType::Index) {
+                if (entry.data.IsIndex()) {
                     return odb.LoadIndex(entry.id).Id();
                 } else {
                     return entry.id;
@@ -428,7 +428,7 @@ void WorkingTree::WriteBlob(const std::filesystem::path& path, const PathEntry& 
         if (obj.Type() == DataType::Blob) {
             auto file = File::ForOverwrite(path);
             file.Write(obj.Data(), obj.Size());
-        } else if (obj.Type() == DataType::Index) {
+        } else if (obj.Type() == DataType::BlobIndex) {
             auto file = File::ForOverwrite(path);
             for (const auto& part : obj.AsIndex().Parts()) {
                 auto blob = odb_.LoadBlob(part.Id());

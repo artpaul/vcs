@@ -120,7 +120,7 @@ TEST(Datastore, InputStream) {
 
     ASSERT_TRUE(id);
     // Check validity of metadata.
-    EXPECT_EQ(odb.GetType(id), DataType::Index);
+    EXPECT_TRUE(odb.GetType(id).IsIndex());
     EXPECT_EQ(odb.GetType(id, true), DataType::Blob);
     EXPECT_EQ(odb.GetMeta(id, true).Size(), data.size());
     // Check equality of content.
@@ -202,8 +202,8 @@ TEST(MemoryCache, BlobChunked) {
         const auto [id, type] = mem.Put(DataType::Blob, content);
 
         ASSERT_TRUE(mem.IsExists(id));
-        ASSERT_EQ(type, DataType::Index);
-        ASSERT_EQ(mem.GetType(id), DataType::Index);
+        ASSERT_TRUE(type.IsIndex());
+        ASSERT_TRUE(mem.GetType(id).IsIndex());
         EXPECT_EQ(mem.LoadIndex(id).Type(), DataType::Blob);
         EXPECT_EQ(mem.LoadIndex(id).Size(), content.size());
         EXPECT_EQ(std::string_view(mem.LoadBlob(id)), content);
@@ -224,7 +224,7 @@ TEST(MemoryCache, TreeChunked) {
     const auto [id, _] = mem.Put(DataType::Tree, builder.Serialize());
 
     ASSERT_TRUE(mem.IsExists(id));
-    ASSERT_EQ(mem.GetType(id), DataType::Index);
+    ASSERT_TRUE(mem.GetType(id).IsIndex());
     EXPECT_EQ(mem.LoadIndex(id).Type(), DataType::Tree);
     EXPECT_EQ(mem.LoadTree(id).Entries().size(), 100u);
 }

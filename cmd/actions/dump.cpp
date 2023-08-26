@@ -72,7 +72,7 @@ int DumpObject(const Options& options, const Workspace& repo) {
         return 0;
     }
 
-    if (obj.Type() == DataType::Index) {
+    if (obj.Type().IsIndex()) {
         const auto index = obj.AsIndex();
 
         fmt::print("index {} {}\n", options.id, obj.Size());

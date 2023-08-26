@@ -124,7 +124,10 @@ bool CheckConsistency(const HashId& id, const Datastore& odb) {
             return CheckRenames(odb.LoadRenames(id), odb);
         case DataType::Tag:
             break;
-        case DataType::Index:
+        case DataType::BlobIndex:
+        case DataType::TreeIndex:
+        case DataType::RenamesIndex:
+            // case DataType::Index:
             return CheckIndex(odb.LoadIndex(id), odb);
     }
     return false;
@@ -144,7 +147,10 @@ bool CheckConsistency(const Object& obj, const Datastore& odb) {
             return CheckRenames(obj.AsRenames(), odb);
         case DataType::Tag:
             break;
-        case DataType::Index:
+        case DataType::BlobIndex:
+        case DataType::TreeIndex:
+        case DataType::RenamesIndex:
+            // case DataType::Index:
             return CheckIndex(obj.AsIndex(), odb);
     }
     return false;

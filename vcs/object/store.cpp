@@ -3,6 +3,8 @@
 
 #include <contrib/fmt/fmt/format.h>
 
+#include <utility>
+
 namespace Vcs {
 namespace {
 
@@ -138,7 +140,7 @@ size_t Datastore::GetChunkSize() const noexcept {
 
 DataHeader Datastore::GetMeta(const HashId& id, bool resolve) const {
     if (auto meta = impl_->GetMeta(id)) {
-        if (resolve && meta.Type() == DataType::Index) {
+        if (resolve && meta.Type().IsIndex()) {
             return static_cast<DataHeader>(LoadIndex(id));
         } else {
             return meta;
@@ -148,7 +150,9 @@ DataHeader Datastore::GetMeta(const HashId& id, bool resolve) const {
 }
 
 DataType Datastore::GetType(const HashId& id, bool resolve) const {
-    return GetMeta(id, resolve).Type();
+    const auto type = GetMeta(id, false).Type();
+
+    return resolve ? type.CoreType() : type;
 }
 
 bool Datastore::IsExists(const HashId& id) const {
@@ -166,7 +170,7 @@ Object Datastore::Load(const HashId& id, DataType expected) const {
 Blob Datastore::LoadBlob(const HashId& id) const {
     const auto obj = Load(id, DataType::Blob);
 
-    if (obj.Type() == DataType::Index) {
+    if (obj.Type().IsIndex()) {
         return ConstructObjectFromIndex(obj.AsIndex(), this).AsBlob();
     } else {
         return obj.AsBlob();
@@ -176,7 +180,7 @@ Blob Datastore::LoadBlob(const HashId& id) const {
 Commit Datastore::LoadCommit(const HashId& id) const {
     const auto obj = Load(id, DataType::Commit);
 
-    if (obj.Type() == DataType::Index) {
+    if (obj.Type().IsIndex()) {
         return ConstructObjectFromIndex(obj.AsIndex(), this).AsCommit();
     } else {
         return obj.AsCommit();
@@ -184,13 +188,14 @@ Commit Datastore::LoadCommit(const HashId& id) const {
 }
 
 Index Datastore::LoadIndex(const HashId& id) const {
-    return Load(id, DataType::Index).AsIndex();
+    return Load(id, DataType::None).AsIndex();
+    // return Load(id, DataType::Index).AsIndex();
 }
 
 Renames Datastore::LoadRenames(const HashId& id) const {
     const auto obj = Load(id, DataType::Renames);
 
-    if (obj.Type() == DataType::Index) {
+    if (obj.Type().IsIndex()) {
         return ConstructObjectFromIndex(obj.AsIndex(), this).AsRenames();
     } else {
         return obj.AsRenames();
@@ -200,7 +205,7 @@ Renames Datastore::LoadRenames(const HashId& id) const {
 Tree Datastore::LoadTree(const HashId& id) const {
     const auto obj = Load(id, DataType::Tree);
 
-    if (obj.Type() == DataType::Index) {
+    if (obj.Type().IsIndex()) {
         return ConstructObjectFromIndex(obj.AsIndex(), this).AsTree();
     } else {
         return obj.AsTree();
@@ -223,8 +228,9 @@ std::pair<HashId, DataType> Datastore::Put(const DataType type, const std::strin
         offset += size;
     }
 
+    const auto index_type = type.ToIndex();
     // Save index.
-    return std::make_pair(impl_->Put(DataType::Index, builder.Serialize()), DataType::Index);
+    return std::make_pair(impl_->Put(index_type, builder.Serialize()), index_type);
 }
 
 std::pair<HashId, DataType> Datastore::Put(const DataHeader meta, InputStream input) {
@@ -265,8 +271,9 @@ std::pair<HashId, DataType> Datastore::Put(const DataHeader meta, InputStream in
     // Set id of the whole object.
     index.SetId(hasher.Build());
 
+    const auto index_type = meta.Type().ToIndex();
     // Save index.
-    return std::make_pair(impl_->Put(DataType::Index, index.Serialize()), DataType::Index);
+    return std::make_pair(impl_->Put(index_type, index.Serialize()), index_type);
 }
 
 } // namespace Vcs

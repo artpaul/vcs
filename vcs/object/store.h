@@ -45,6 +45,14 @@ public:
         return Datastore(Datastore(), std::make_shared<B>(std::forward<Args>(args)...), false);
     }
 
+    static constexpr bool IsUnexpected(const DataType type, const DataType expected) noexcept {
+        if (expected == DataType::None) {
+            return false;
+        }
+        // Match by core type.
+        return (uint8_t(type) & 0x07) != (uint8_t(expected) & 0x07);
+    }
+
 public:
     explicit Datastore(const size_t chunk_size = (4u << 20));
 

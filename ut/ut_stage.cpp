@@ -251,11 +251,11 @@ TEST(StageArea, SaveTreeChunked) {
 
     StageArea index(mem, tree_id);
 
-    EXPECT_EQ(mem.GetType(tree_id), DataType::Index);
+    EXPECT_TRUE(mem.GetType(tree_id).IsIndex());
     EXPECT_EQ(mem.GetType(tree_id, true), DataType::Tree);
 
     ASSERT_EQ(mem.LoadTree(tree_id).Entries().size(), 51u);
 
     ASSERT_TRUE(index.GetEntry("dir"));
-    ASSERT_EQ(index.GetEntry("dir")->data, DataType::Index);
+    EXPECT_TRUE(index.GetEntry("dir")->data.IsIndex());
 }
