@@ -44,18 +44,6 @@ class Filesystem {
         }
     };
 
-    struct BlobHandle : BaseHandle {
-        /// Flags which the file was opened with.
-        const int flags = 0;
-        /// Handle of an immutable blob object.
-        std::optional<Object> blob;
-
-        explicit BlobHandle(const Meta& m, Object obj) noexcept
-            : BaseHandle(m)
-            , blob(std::move(obj)) {
-        }
-    };
-
     struct DirectoryHandle : BaseHandle {
         std::variant<Tree, std::map<std::string, Directory::Entry, std::less<>>> entries;
 
@@ -70,6 +58,21 @@ class Filesystem {
         }
     };
 
+    struct FileHandle : BaseHandle {
+        /// File descriptor.
+        std::variant<Object, int> fd;
+
+        FileHandle(const Meta& m, Object obj) noexcept
+            : BaseHandle(m)
+            , fd(std::move(obj)) {
+        }
+
+        FileHandle(const Meta& m, int f) noexcept
+            : BaseHandle(m)
+            , fd(f) {
+        }
+    };
+
     using DirectoryPtr = std::shared_ptr<Directory>;
 
 public:
@@ -78,6 +81,8 @@ public:
     ~Filesystem();
 
 public:
+    int Create(const std::string_view path, mode_t mode, fuse_file_info* fi);
+
     int Chmod(const std::string_view path, mode_t mode, fuse_file_info* fi);
 
     int GetAttr(const std::string_view path, struct stat*, fuse_file_info*);
@@ -101,6 +106,8 @@ public:
     int Rmdir(const std::string_view path);
 
     int StatFs(struct statvfs* fs);
+
+    int Utimens(const std::string_view path, const timespec tv[2], fuse_file_info* fi);
 
 private:
     Meta GetActualMetadata(const std::string_view path, const PathEntry& e) const;

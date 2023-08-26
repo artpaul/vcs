@@ -133,7 +133,7 @@ void Filesystem::LoadSate() {
             ei->second.directory.reset();
         }
 
-        ei->second.meta.mode = st.st_mode | S_MUTABLE;
+        ei->second.meta.mode = st.st_mode | S_IFMUT;
         ei->second.meta.size = st.st_size;
         ei->second.meta.ctime = st.st_ctim;
         ei->second.meta.mtime = st.st_mtim;
@@ -192,6 +192,39 @@ void Filesystem::LoadSate() {
     metabase_->Delete(to_remove);
 }
 
+int Filesystem::Create(const std::string_view path, mode_t mode, fuse_file_info* fi) {
+    const auto parts = SplitPath(path);
+    std::shared_lock lock(root_mutex_);
+
+    if (auto parent = GetMutableParentNoLock(parts, true)) {
+        std::lock_guard lock(parent->mutex);
+
+        auto ei = parent->entries.find(parts.back());
+        // An entry is exist.
+        if (ei != parent->entries.end()) {
+            return -EEXIST;
+        }
+
+        int fd = ::open((mutable_path_ / path).c_str(), fi->flags, mode);
+        // Error on open.
+        if (fd == -1) {
+            return -errno;
+        }
+
+        ei = parent->entries.emplace(parts.back(), Directory::Entry()).first;
+
+        ei->second.meta.mode = mode | S_IFREG | S_IFMUT;
+        ei->second.meta.ctime = timespec{.tv_sec = time(0), .tv_nsec = 0};
+        ei->second.meta.mtime = ei->second.meta.ctime;
+
+        fi->fh = std::bit_cast<uint64_t>(new FileHandle(ei->second.meta, fd));
+
+        return 0;
+    } else {
+        return -ENOTDIR;
+    }
+}
+
 int Filesystem::Chmod(const std::string_view path, mode_t mode, fuse_file_info* fi) {
     if (fi) {
         if (fi->fh) {
@@ -235,7 +268,7 @@ int Filesystem::GetAttr(const std::string_view path, struct stat* st, fuse_file_
             st->st_size = 4096;
         }
         // Clear internal flag.
-        st->st_mode = st->st_mode & ~S_MUTABLE;
+        st->st_mode = st->st_mode & ~S_IFMUT;
         // Timestamps.
         st->st_ctim = meta.ctime;
         st->st_mtim = meta.mtime;
@@ -351,7 +384,7 @@ int Filesystem::Mkdir(const std::string_view path, mode_t mode) {
         }
         // Setup the entry.
         ei->second.meta.id = HashId();
-        ei->second.meta.mode = S_MUTABLE | S_IFDIR | (mode & ALLPERMS);
+        ei->second.meta.mode = S_IFMUT | S_IFDIR | (mode & ALLPERMS);
         ei->second.meta.size = 0;
         ei->second.meta.ctime = timespec{.tv_sec = time(0), .tv_nsec = 0};
         ei->second.meta.mtime = ei->second.meta.ctime;
@@ -384,7 +417,7 @@ int Filesystem::Open(const std::string_view path, fuse_file_info* fi) {
         return -EISDIR;
     }
 
-    fi->fh = std::bit_cast<uint64_t>(new BlobHandle(
+    fi->fh = std::bit_cast<uint64_t>(new FileHandle(
         MakeMeta(*e, Timestamps{.ctime = root_time_, .mtime = root_time_}), blobs_.Load(e->id, e->data)
     ));
     fi->keep_cache = 1;
@@ -505,17 +538,17 @@ int Filesystem::Read(char* buf, size_t size, off_t offset, fuse_file_info* fi) {
         return -EBADF;
     }
 
-    auto handle = std::bit_cast<const BlobHandle*>(fi->fh);
-    auto obj = handle->blob;
+    auto handle = std::bit_cast<const FileHandle*>(fi->fh);
+    auto obj = std::get<0>(handle->fd);
 
-    if (obj->Type() == DataType::Blob) {
-        if (offset >= obj->Size()) {
+    if (obj.Type() == DataType::Blob) {
+        if (offset >= obj.Size()) {
             return 0;
         }
         // Adjust reading size.
-        size = std::min(size, obj->Size() - offset);
+        size = std::min(size, obj.Size() - offset);
         // Copy data.
-        std::memcpy(buf, static_cast<const char*>(obj->Data()) + offset, size);
+        std::memcpy(buf, static_cast<const char*>(obj.Data()) + offset, size);
         // Return number of readed bytes.
         return size;
     }
@@ -622,7 +655,13 @@ int Filesystem::ReadLink(const std::string_view path, char* buf, size_t size) {
 
 int Filesystem::Release(struct fuse_file_info* fi) {
     if (fi) {
-        delete std::bit_cast<BlobHandle*>(fi->fh);
+        if (auto handle = std::bit_cast<FileHandle*>(fi->fh)) {
+            if (handle->fd.index() == 1) {
+                ::close(std::get<1>(handle->fd));
+            }
+
+            delete handle;
+        };
     }
     return 0;
 }
@@ -647,7 +686,7 @@ int Filesystem::Rmdir(const std::string_view path) {
             return -ENOENT;
         }
 
-        if (ei->second.meta.mode & S_MUTABLE) {
+        if (S_ISMUT(ei->second.meta.mode)) {
             ::rmdir((mutable_path_ / path).c_str());
         }
 
@@ -668,6 +707,24 @@ int Filesystem::StatFs(struct statvfs* fs) {
     fs->f_bsize = 4096;
     fs->f_namemax = 255;
     return 0;
+}
+
+int Filesystem::Utimens(const std::string_view path, const timespec tv[2], fuse_file_info* fi) {
+    if (fi) {
+        if (auto handle = std::bit_cast<FileHandle*>(fi->fh)) {
+            if (handle->fd.index() == 0) {
+                return -EIO;
+            }
+            if (handle->fd.index() == 1) {
+                if (::futimens(std::get<1>(handle->fd), tv) != 0) {
+                    return -errno;
+                }
+                return 0;
+            }
+        }
+    }
+
+    return -ENOSYS;
 }
 
 Filesystem::DirectoryPtr Filesystem::GetMutableParentNoLock(
@@ -706,7 +763,7 @@ Filesystem::DirectoryPtr Filesystem::GetMutableParentNoLock(
                         return {};
                     }
 
-                    entry.meta.mode |= S_MUTABLE;
+                    entry.meta.mode |= S_IFMUT;
                 }
             }
             if (auto d = entry.directory) {
@@ -746,7 +803,7 @@ void Filesystem::SetupAttributes(const PathEntry& e, struct stat* st) const noex
             break;
     }
     // Clear internal flag.
-    st->st_mode = st->st_mode & ~S_MUTABLE;
+    st->st_mode = st->st_mode & ~S_IFMUT;
     // Timestamps.
     st->st_ctim = root_time_;
     st->st_mtim = root_time_;

@@ -45,6 +45,10 @@ static void FsDestory(void*) {
     gFs.reset();
 }
 
+static int FsCreate(const char* path, mode_t mode, struct fuse_file_info* fi) {
+    return Invoke(&Filesystem::Create, std::string_view(path + 1), mode, fi);
+}
+
 static int FsChmod(const char* path, mode_t mode, struct fuse_file_info* fi) {
     return Invoke(&Filesystem::Chmod, path ? std::string_view(path + 1) : std::string_view(), mode, fi);
 }
@@ -100,6 +104,10 @@ static int FsStatFs(const char*, struct statvfs* fs) {
     return Invoke(&Filesystem::StatFs, fs);
 }
 
+static int FsUtimens(const char* path, const struct timespec tv[2], struct fuse_file_info* fi) {
+    return Invoke(&Filesystem::Utimens, path ? std::string_view(path + 1) : std::string_view(), tv, fi);
+}
+
 int MountWorktree(const MountOptions& options) {
     assert(options.mount_path.is_absolute());
     assert(options.repository);
@@ -110,6 +118,7 @@ int MountWorktree(const MountOptions& options) {
     ops.init = FsInit;
     ops.destroy = FsDestory;
     ops.chmod = FsChmod;
+    ops.create = FsCreate;
     ops.getattr = FsGetAttr;
     ops.mkdir = FsMkdir;
     ops.open = FsOpen;
@@ -121,6 +130,7 @@ int MountWorktree(const MountOptions& options) {
     ops.releasedir = FsReleaseDir;
     ops.rmdir = FsRmdir;
     ops.statfs = FsStatFs;
+    ops.utimens = FsUtimens;
 
     // Don't mask creation mode, kernel already did that.
     ::umask(0);

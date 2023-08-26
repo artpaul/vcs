@@ -5,7 +5,10 @@
 namespace Vcs::Fs {
 
 /// Mutable file.
-#define S_MUTABLE (1u << 31)
+#define S_IFMUT (1u << 31)
+
+/// Check if an entry is mutable.
+#define S_ISMUT(mode) (((mode) & (S_IFMUT)) != 0)
 
 struct Meta {
     HashId id;
